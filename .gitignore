@@ -1,0 +1,11 @@
+# Lokale Konfiguration – nie committen
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# Docker Build-Cache
+*.tar

@@ -1,0 +1,13 @@
+services:
+  hlc20-mqtt:
+    build: .
+    image: hlc20-mqtt:latest
+    container_name: hlc20-mqtt
+    restart: unless-stopped
+    env_file: .env
+    network_mode: host        # direkt im Host-Netzwerk → Silex + Mosquitto erreichbar
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
