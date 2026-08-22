@@ -1,5 +1,6 @@
 """FastAPI web application: routes, WebSocket, HTMX partials."""
 import asyncio
+import json
 import logging
 import os
 import uuid
@@ -12,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 from config import Config, save_config
 from hlc_parser import parse_hlc
+import paho.mqtt.client as mqtt
 from protocol import hlc_open
 from state import AppState
 
@@ -372,6 +374,41 @@ async def test_serial(
         echo = await loop.run_in_executor(_executor, _do)
         return HTMLResponse(
             f'<span class="text-green-400 font-medium">✓ Verbunden – Echo: {echo}</span>'
+        )
+    except Exception as exc:
+        return HTMLResponse(
+            f'<span class="text-red-400 font-medium">✗ Fehler: {exc}</span>'
+        )
+
+
+@app.post("/api/test-mqtt", response_class=HTMLResponse)
+async def test_mqtt(
+    mqtt_host: str = Form(default=""),
+    mqtt_port: int = Form(default=1883),
+    mqtt_user: str = Form(default=""),
+    mqtt_password: str = Form(default=""),
+    device_topic: str = Form(default="hlc20"),
+):
+    if not mqtt_host:
+        return HTMLResponse('<span class="text-yellow-400 font-medium">⚠ Kein MQTT-Host angegeben</span>')
+    loop = asyncio.get_running_loop()
+    def _do() -> str:
+        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="hlc20_test")
+        if mqtt_user:
+            client.username_pw_set(mqtt_user, mqtt_password)
+        client.connect(mqtt_host, mqtt_port, keepalive=10)
+        client.loop_start()
+        test_topic = f"{device_topic}/test"
+        payload = json.dumps({"source": "hlc20-bridge", "test": True, "value": 99.9})
+        info = client.publish(test_topic, payload)
+        info.wait_for_publish(timeout=5)
+        client.loop_stop()
+        client.disconnect()
+        return test_topic
+    try:
+        topic = await loop.run_in_executor(_executor, _do)
+        return HTMLResponse(
+            f'<span class="text-green-400 font-medium">✓ Verbunden – Testnachricht an <code>{topic}</code> gesendet</span>'
         )
     except Exception as exc:
         return HTMLResponse(
