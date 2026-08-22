@@ -31,6 +31,7 @@
               ('/', 'dashboard',    'Dashboard'),
               ('/bus-monitor', 'bus_monitor', 'Bus-Monitor'),
               ('/sensoren',    'sensoren',    'Sensoren'),
+              ('/hlc-analyse', 'hlc_analyse', 'HLC-Datei'),
               ('/einstellungen','einstellungen','Einstellungen'),
             ] %}
             {% for href, key, label in nav_items %}
@@ -66,6 +67,7 @@
           ('/', 'dashboard', 'Dashboard'),
           ('/bus-monitor', 'bus_monitor', 'Bus-Monitor'),
           ('/sensoren', 'sensoren', 'Sensoren'),
+          ('/hlc-analyse', 'hlc_analyse', 'HLC-Datei'),
           ('/einstellungen', 'einstellungen', 'Einstellungen'),
         ] %}
         <a href="{{ href }}"

@@ -6,11 +6,12 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Form, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from config import Config, save_config
+from hlc_parser import parse_hlc
 from protocol import hlc_open
 from state import AppState
 
@@ -104,6 +105,50 @@ async def einstellungen_page(request: Request):
         "einstellungen",
         cfg=_c(request),
     ))
+
+
+@app.get("/hlc-analyse", response_class=HTMLResponse)
+async def hlc_analyse_page(request: Request):
+    return templates.TemplateResponse(request, "hlc_upload.html", _ctx("hlc_analyse"))
+
+
+@app.post("/api/hlc-parse")
+async def hlc_parse_route(request: Request, file: UploadFile = File(...)):
+    if file.size and file.size > 10 * 1024 * 1024:
+        raise HTTPException(413, "Datei zu groß (max 10 MB)")
+    data = await file.read()
+    if len(data) < 20:
+        raise HTTPException(400, "Datei zu klein oder leer")
+
+    module_map = parse_hlc(data)
+    if not module_map:
+        raise HTTPException(422, "Keine Module gefunden – ist es eine gültige .hlc-Datei?")
+
+    cfg = _c(request)
+    known_sensors = {s["mod"]: {"id": s["id"], "label": s["label"], "kind": "sensor"}
+                     for s in cfg.sensors}
+    known_params  = {p["mod"]: {"id": p["id"], "label": p["label"], "kind": "param"}
+                     for p in cfg.params}
+
+    modules = []
+    for mod in sorted(module_map):
+        labels = module_map[mod]
+        in_cfg = known_sensors.get(mod) or known_params.get(mod)
+        modules.append({
+            "mod":      mod,
+            "hex":      f"0x{mod:02X}",
+            "labels":   labels,
+            "label":    labels[0] if labels else "",
+            "in_config": in_cfg,
+        })
+
+    return JSONResponse({
+        "filename":    file.filename,
+        "file_size":   len(data),
+        "total":       len(module_map),
+        "in_config":   sum(1 for m in modules if m["in_config"]),
+        "modules":     modules,
+    })
 
 
 # ── API: Status & Values ──────────────────────────────────────────────────────

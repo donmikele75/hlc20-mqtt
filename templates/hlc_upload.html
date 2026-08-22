@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+{% block title %}HLC-Datei Analyse{% endblock %}
+
+{% block content %}
+<div x-data="hlcAnalyse()" class="space-y-6">
+
+  <h1 class="text-xl font-semibold">HLC-Datei Analyse</h1>
+
+  {# ── Upload area ──────────────────────────────────────────────────────── #}
+  <div class="bg-slate-800 border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer"
+       :class="dragover ? 'border-blue-500 bg-blue-950/20' : 'border-slate-700 hover:border-slate-500'"
+       @dragover.prevent="dragover=true"
+       @dragleave="dragover=false"
+       @drop.prevent="onDrop($event)"
+       @click="$refs.fileInput.click()">
+    <input type="file" accept=".hlc" x-ref="fileInput"
+           class="hidden" @change="onFileChange($event)">
+
+    <template x-if="!fileName">
+      <div class="space-y-2">
+        <svg class="w-10 h-10 mx-auto text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+        </svg>
+        <p class="text-slate-300 font-medium">
+          .hlc-Datei hierher ziehen oder klicken
+        </p>
+        <p class="text-slate-600 text-sm">Hanazeder HLC-20 Konfigurationsdatei</p>
+      </div>
+    </template>
+
+    <template x-if="fileName">
+      <div class="space-y-1">
+        <svg class="w-8 h-8 mx-auto text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <p class="text-slate-200 font-medium" x-text="fileName"></p>
+        <p class="text-slate-500 text-sm" x-text="fileSize"></p>
+      </div>
+    </template>
+  </div>
+
+  {# ── Loading ───────────────────────────────────────────────────────────── #}
+  <div x-show="loading" x-cloak class="flex items-center gap-3 text-slate-400">
+    <svg class="w-5 h-5 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+    </svg>
+    Datei wird analysiert…
+  </div>
+
+  {# ── Error ────────────────────────────────────────────────────────────── #}
+  <div x-show="error" x-cloak
+       class="bg-red-950 border border-red-800 text-red-300 rounded-xl px-4 py-3 text-sm"
+       x-text="error"></div>
+
+  {# ── Results ──────────────────────────────────────────────────────────── #}
+  <template x-if="results">
+    <div class="space-y-5 fade-in">
+
+      {# Summary cards #}
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+          <div class="text-3xl font-bold font-mono text-slate-100" x-text="results.total"></div>
+          <div class="text-xs text-slate-500 mt-1">Module in Datei</div>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+          <div class="text-3xl font-bold font-mono text-green-400" x-text="results.in_config"></div>
+          <div class="text-xs text-slate-500 mt-1">In Bridge-Config</div>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+          <div class="text-3xl font-bold font-mono text-blue-400"
+               x-text="results.total - results.in_config"></div>
+          <div class="text-xs text-slate-500 mt-1">Neu / unbekannt</div>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+          <div class="text-sm font-mono text-slate-400 break-all" x-text="results.filename"></div>
+          <div class="text-xs text-slate-600 mt-1" x-text="fileSizeFmt(results.file_size)"></div>
+        </div>
+      </div>
+
+      {# Filter + search toolbar #}
+      <div class="flex flex-wrap items-center gap-3">
+        <input x-model="search" type="text" placeholder="Modul-Nr. oder Label…"
+               class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 w-52
+                      focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-600">
+        <div class="flex rounded-lg border border-slate-700 overflow-hidden text-sm">
+          <button @click="filter='all'"
+                  :class="filter==='all' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-100'"
+                  class="px-3 py-1.5 transition-colors">Alle</button>
+          <button @click="filter='new'"
+                  :class="filter==='new' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-100'"
+                  class="px-3 py-1.5 transition-colors">Neu</button>
+          <button @click="filter='known'"
+                  :class="filter==='known' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-100'"
+                  class="px-3 py-1.5 transition-colors">Bekannte</button>
+        </div>
+        <span class="text-xs text-slate-500">
+          <span x-text="filteredModules.length"></span> Einträge
+        </span>
+      </div>
+
+      {# Results table #}
+      <div class="overflow-x-auto rounded-xl border border-slate-700">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-800 text-xs text-slate-400 uppercase tracking-wider">
+            <tr>
+              <th class="px-3 py-2.5 text-left w-16">Mod</th>
+              <th class="px-3 py-2.5 text-left w-16">Hex</th>
+              <th class="px-3 py-2.5 text-left">Label(s) in .hlc</th>
+              <th class="px-3 py-2.5 text-left">Bridge-Status</th>
+              <th class="px-3 py-2.5 text-left">Aktion</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800">
+            <template x-if="filteredModules.length === 0">
+              <tr>
+                <td colspan="5" class="px-3 py-8 text-center text-slate-600">
+                  Keine Einträge für diesen Filter
+                </td>
+              </tr>
+            </template>
+            <template x-for="m in filteredModules" :key="m.mod">
+              <tr class="hover:bg-slate-800/50 transition-colors">
+                <td class="px-3 py-2.5 font-mono font-semibold text-slate-200"
+                    x-text="m.mod"></td>
+                <td class="px-3 py-2.5 font-mono text-xs text-slate-500"
+                    x-text="m.hex"></td>
+                <td class="px-3 py-2.5 text-slate-100">
+                  <template x-if="m.labels.length === 1">
+                    <span x-text="m.labels[0]"></span>
+                  </template>
+                  <template x-if="m.labels.length > 1">
+                    <div class="space-y-0.5">
+                      <template x-for="(l, i) in m.labels" :key="i">
+                        <div :class="i === 0 ? 'text-slate-100' : 'text-slate-500 text-xs'"
+                             x-text="l"></div>
+                      </template>
+                    </div>
+                  </template>
+                </td>
+                <td class="px-3 py-2.5">
+                  <template x-if="m.in_config">
+                    <div class="flex flex-col gap-0.5">
+                      <span class="inline-flex items-center gap-1 text-xs font-medium text-green-400">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <span x-text="m.in_config.kind === 'sensor' ? 'Sensor' : 'Parameter'"></span>
+                      </span>
+                      <span class="text-xs text-slate-400 font-mono" x-text="m.in_config.id"></span>
+                      <span x-show="m.in_config.label !== m.label"
+                            class="text-xs text-yellow-600"
+                            x-text="'Bridge: ' + m.in_config.label"></span>
+                    </div>
+                  </template>
+                  <template x-if="!m.in_config">
+                    <span class="text-xs text-slate-600 italic">nicht konfiguriert</span>
+                  </template>
+                </td>
+                <td class="px-3 py-2.5">
+                  <template x-if="!m.in_config">
+                    <div class="flex gap-2">
+                      <button @click="openModal(m, 'sensor')"
+                              class="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2">
+                        Sensor
+                      </button>
+                      <span class="text-slate-700">|</span>
+                      <button @click="openModal(m, 'param')"
+                              class="text-xs text-purple-400 hover:text-purple-300 underline underline-offset-2">
+                        Parameter
+                      </button>
+                    </div>
+                  </template>
+                  <template x-if="m.in_config">
+                    <a href="/sensoren" class="text-xs text-slate-600 hover:text-slate-400 underline underline-offset-2">
+                      öffnen
+                    </a>
+                  </template>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </template>
+
+  {# ── Add modal ────────────────────────────────────────────────────────── #}
+  <div x-show="modalOpen" x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+    <div @click.outside="modalOpen=false"
+         class="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl fade-in">
+      <h2 class="text-lg font-semibold mb-1"
+          x-text="modalKind==='sensor' ? 'Als Sensor hinzufügen' : 'Als Parameter hinzufügen'"></h2>
+      <p class="text-xs text-slate-500 mb-4">
+        Modul <span class="font-mono text-slate-400" x-text="modalForm.mod"></span>
+        · <span class="font-mono text-slate-400" x-text="modalForm.hex"></span>
+      </p>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">ID</label>
+          <input x-model="modalForm.id" type="text"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Label</label>
+          <input x-model="modalForm.label" type="text"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+
+        <template x-if="modalKind === 'sensor'">
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Art</label>
+            <select x-model="modalForm.kind"
+                    class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <option value="temp">Temperatur (°C)</option>
+              <option value="pump">Pumpe (AN/AUS)</option>
+            </select>
+          </div>
+        </template>
+
+        <template x-if="modalKind === 'param'">
+          <div class="flex gap-3">
+            <div class="flex-1">
+              <label class="block text-xs text-slate-400 mb-1">Index</label>
+              <input x-model.number="modalForm.idx" type="number" min="0" max="255"
+                     class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            </div>
+            <div class="flex-1">
+              <label class="block text-xs text-slate-400 mb-1">Einheit</label>
+              <input x-model="modalForm.unit" type="text"
+                     class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            </div>
+          </div>
+        </template>
+
+        <div x-show="modalError" class="text-red-400 text-sm" x-text="modalError"></div>
+      </div>
+
+      <div class="flex justify-end gap-3 mt-5">
+        <button @click="modalOpen=false"
+                class="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-100">Abbrechen</button>
+        <button @click="submitModal()"
+                :class="modalKind==='sensor' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'"
+                class="px-4 py-2 rounded-lg text-sm text-white transition-colors">
+          Hinzufügen
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function hlcAnalyse() {
+  return {
+    fileName: '',
+    fileSize: '',
+    file: null,
+    loading: false,
+    error: '',
+    results: null,
+    filter: 'all',
+    search: '',
+    dragover: false,
+    modalOpen: false,
+    modalKind: 'sensor',
+    modalEntry: null,
+    modalForm: {},
+    modalError: '',
+
+    onFileChange(e) {
+      const f = e.target.files[0];
+      if (f) this.loadFile(f);
+    },
+
+    onDrop(e) {
+      this.dragover = false;
+      const f = e.dataTransfer.files[0];
+      if (f) this.loadFile(f);
+    },
+
+    loadFile(f) {
+      this.file     = f;
+      this.fileName = f.name;
+      this.fileSize = this.fileSizeFmt(f.size);
+      this.results  = null;
+      this.error    = '';
+      this.search   = '';
+      this.filter   = 'all';
+      this.parse();
+    },
+
+    async parse() {
+      this.loading = true;
+      this.error   = '';
+      const fd = new FormData();
+      fd.append('file', this.file);
+      try {
+        const r = await fetch('/api/hlc-parse', { method: 'POST', body: fd });
+        const data = await r.json();
+        if (!r.ok) { this.error = data.detail || 'Parse-Fehler'; }
+        else { this.results = data; }
+      } catch (e) {
+        this.error = 'Netzwerkfehler: ' + e.message;
+      }
+      this.loading = false;
+    },
+
+    get filteredModules() {
+      if (!this.results) return [];
+      return this.results.modules.filter(m => {
+        if (this.filter === 'new'   && m.in_config)  return false;
+        if (this.filter === 'known' && !m.in_config) return false;
+        if (this.search) {
+          const q = this.search.toLowerCase();
+          const modMatch   = String(m.mod).includes(q) || m.hex.toLowerCase().includes(q);
+          const labelMatch = m.labels.some(l => l.toLowerCase().includes(q));
+          if (!modMatch && !labelMatch) return false;
+        }
+        return true;
+      });
+    },
+
+    fileSizeFmt(bytes) {
+      if (bytes < 1024)        return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    },
+
+    openModal(m, kind) {
+      this.modalKind  = kind;
+      this.modalEntry = m;
+      this.modalError = '';
+      const slug = m.labels[0]
+        ? m.labels[0].toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 24)
+        : 'mod' + m.mod;
+      this.modalForm = {
+        id:    kind === 'sensor' ? slug : slug + '_p',
+        label: m.labels[0] || 'Modul ' + m.mod,
+        mod:   m.mod,
+        hex:   m.hex,
+        kind:  'temp',
+        idx:   0,
+        unit:  '°C',
+      };
+      this.modalOpen = true;
+    },
+
+    async submitModal() {
+      this.modalError = '';
+      const fd = new FormData();
+      let url;
+      if (this.modalKind === 'sensor') {
+        url = '/api/sensors/add';
+        fd.append('sid',       this.modalForm.id);
+        fd.append('label',     this.modalForm.label);
+        fd.append('mod',       this.modalForm.mod);
+        fd.append('kind',      this.modalForm.kind);
+        fd.append('error_raw', '');
+      } else {
+        url = '/api/params/add';
+        fd.append('pid',   this.modalForm.id);
+        fd.append('label', this.modalForm.label);
+        fd.append('mod',   this.modalForm.mod);
+        fd.append('idx',   this.modalForm.idx);
+        fd.append('unit',  this.modalForm.unit);
+      }
+      const r = await fetch(url, { method: 'POST', body: fd });
+      if (r.ok) {
+        // Update in-place so row changes to "bekannt"
+        const m = this.results.modules.find(x => x.mod === this.modalEntry.mod);
+        if (m) {
+          m.in_config = {
+            kind:  this.modalKind,
+            id:    this.modalForm.id,
+            label: this.modalForm.label,
+          };
+          this.results.in_config++;
+        }
+        this.modalOpen = false;
+      } else {
+        const d = await r.json();
+        this.modalError = d.detail || 'Fehler';
+      }
+    },
+  };
+}
+</script>
+{% endblock %}
