@@ -30,8 +30,8 @@ DEFAULT_SENSORS = [
     {"id": "raum_temp",     "label": "Raum-Temp",      "mod": 173, "kind": "temp", "error_raw": [1800]},
     # Pumpen
     {"id": "pumpe_solar",   "label": "Pumpe Solar",    "mod": 75,  "kind": "pump", "error_raw": []},
-    {"id": "pumpe_hk",      "label": "Pumpe HK",       "mod": 46,  "kind": "pump", "error_raw": []},
-    {"id": "pumpe_fbh",     "label": "Pumpe FBH",      "mod": 153, "kind": "pump", "error_raw": []},
+    {"id": "pumpe_hk",      "label": "Pumpe HK",       "mod": 43,  "kind": "pump", "error_raw": []},
+    {"id": "pumpe_fbh",     "label": "Pumpe FBH",      "mod": 150, "kind": "pump", "error_raw": []},
     {"id": "pumpe_zirk",    "label": "Pumpe Zirk",     "mod": 83,  "kind": "pump", "error_raw": []},
     {"id": "pumpe_kessel",  "label": "Pumpe Kessel",   "mod": 8,   "kind": "pump", "error_raw": []},
     # Kessel
