@@ -23,6 +23,73 @@ _DEVICE_INFO = {
 }
 
 
+def publish_discovery(client: mqtt.Client, cfg: Config) -> None:
+    """Publish Home Assistant MQTT discovery configs for all sensors/params."""
+    for s in cfg.sensors:
+        sid, label, kind = s["id"], s["label"], s.get("kind", "temp")
+        if kind == "temp":
+            disc = {
+                "name": label, "unique_id": f"hlc20_{sid}",
+                "state_topic": f"{cfg.device_topic}/sensor/{sid}",
+                "unit_of_measurement": "°C", "device_class": "temperature",
+                "state_class": "measurement", "device": _DEVICE_INFO,
+            }
+            client.publish(
+                f"{cfg.discovery_prefix}/sensor/hlc20_{sid}/config",
+                json.dumps(disc), retain=True)
+        else:
+            disc = {
+                "name": label, "unique_id": f"hlc20_{sid}",
+                "state_topic": f"{cfg.device_topic}/binary_sensor/{sid}",
+                "device_class": "running",
+                "payload_on": "ON", "payload_off": "OFF",
+                "device": _DEVICE_INFO,
+            }
+            client.publish(
+                f"{cfg.discovery_prefix}/binary_sensor/hlc20_{sid}/config",
+                json.dumps(disc), retain=True)
+
+    for p in cfg.params:
+        pid, unit = p["id"], p.get("unit", "°C")
+        disc: dict = {
+            "name": p["label"], "unique_id": f"hlc20_{pid}",
+            "state_topic": f"{cfg.device_topic}/sensor/{pid}",
+            "state_class": "measurement", "device": _DEVICE_INFO,
+        }
+        if unit == "°C":
+            disc["unit_of_measurement"] = "°C"
+            disc["device_class"] = "temperature"
+        elif unit:
+            disc["unit_of_measurement"] = unit
+        client.publish(
+            f"{cfg.discovery_prefix}/sensor/hlc20_{pid}/config",
+            json.dumps(disc), retain=True)
+
+    # Mischer-Positionsschaetzung: nur Prozentwert, kein device_class (kein Standard-Sensortyp)
+    for sid, label in (("mischer_hk_position", "Mischer HK Position (geschätzt)"),
+                       ("mischer_fbh_position", "Mischer FBH Position (geschätzt)")):
+        disc = {
+            "name": label, "unique_id": f"hlc20_{sid}",
+            "state_topic": f"{cfg.device_topic}/sensor/{sid}",
+            "unit_of_measurement": "%", "device": _DEVICE_INFO,
+        }
+        client.publish(
+            f"{cfg.discovery_prefix}/sensor/hlc20_{sid}/config",
+            json.dumps(disc), retain=True)
+
+
+def publish_state_snapshot(client: mqtt.Client, cfg: Config, values: dict) -> None:
+    """Republish the last known value of every entry (e.g. for a manual test telegram)."""
+    for entry in values.values():
+        sid = entry.get("id")
+        kind = entry.get("kind")
+        value = entry.get("value")
+        if not sid or value is None:
+            continue
+        topic_kind = "sensor" if kind in ("temp", "param", "mixer_position") else "binary_sensor"
+        client.publish(f"{cfg.device_topic}/{topic_kind}/{sid}", str(value))
+
+
 def _to_hex(raw: int) -> str:
     u = raw if raw >= 0 else raw + 65536
     return f"{u & 0xFF:02X} {(u >> 8) & 0xFF:02X}"
@@ -324,55 +391,4 @@ class PollerThread(threading.Thread):
         self.state.mqtt_connected = False
 
     def _publish_discovery(self, client: mqtt.Client) -> None:
-        cfg = self._cfg
-        for s in cfg.sensors:
-            sid, label, kind = s["id"], s["label"], s.get("kind", "temp")
-            if kind == "temp":
-                disc = {
-                    "name": label, "unique_id": f"hlc20_{sid}",
-                    "state_topic": f"{cfg.device_topic}/sensor/{sid}",
-                    "unit_of_measurement": "°C", "device_class": "temperature",
-                    "state_class": "measurement", "device": _DEVICE_INFO,
-                }
-                client.publish(
-                    f"{cfg.discovery_prefix}/sensor/hlc20_{sid}/config",
-                    json.dumps(disc), retain=True)
-            else:
-                disc = {
-                    "name": label, "unique_id": f"hlc20_{sid}",
-                    "state_topic": f"{cfg.device_topic}/binary_sensor/{sid}",
-                    "device_class": "running",
-                    "payload_on": "ON", "payload_off": "OFF",
-                    "device": _DEVICE_INFO,
-                }
-                client.publish(
-                    f"{cfg.discovery_prefix}/binary_sensor/hlc20_{sid}/config",
-                    json.dumps(disc), retain=True)
-
-        for p in cfg.params:
-            pid, unit = p["id"], p.get("unit", "°C")
-            disc: dict = {
-                "name": p["label"], "unique_id": f"hlc20_{pid}",
-                "state_topic": f"{cfg.device_topic}/sensor/{pid}",
-                "state_class": "measurement", "device": _DEVICE_INFO,
-            }
-            if unit == "°C":
-                disc["unit_of_measurement"] = "°C"
-                disc["device_class"] = "temperature"
-            elif unit:
-                disc["unit_of_measurement"] = unit
-            client.publish(
-                f"{cfg.discovery_prefix}/sensor/hlc20_{pid}/config",
-                json.dumps(disc), retain=True)
-
-        # Mischer-Positionsschaetzung: nur Prozentwert, kein device_class (kein Standard-Sensortyp)
-        for sid, label in (("mischer_hk_position", "Mischer HK Position (geschätzt)"),
-                           ("mischer_fbh_position", "Mischer FBH Position (geschätzt)")):
-            disc = {
-                "name": label, "unique_id": f"hlc20_{sid}",
-                "state_topic": f"{cfg.device_topic}/sensor/{sid}",
-                "unit_of_measurement": "%", "device": _DEVICE_INFO,
-            }
-            client.publish(
-                f"{cfg.discovery_prefix}/sensor/hlc20_{sid}/config",
-                json.dumps(disc), retain=True)
+        publish_discovery(client, self._cfg)

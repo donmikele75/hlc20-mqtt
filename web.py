@@ -15,6 +15,7 @@ from fastapi.templating import Jinja2Templates
 from config import Config, save_config
 from hlc_parser import parse_hlc
 import paho.mqtt.client as mqtt
+from poller import publish_discovery, publish_state_snapshot
 from protocol import hlc_open
 from state import AppState
 
@@ -389,6 +390,52 @@ async def save_mischer_einstellungen(
     return HTMLResponse(
         '<span class="text-green-400 font-medium">✓ Gespeichert</span>'
     )
+
+
+@app.post("/api/publish-sample", response_class=HTMLResponse)
+async def publish_sample(
+    request: Request,
+    mqtt_host: str = Form(default=""),
+    mqtt_port: int = Form(default=1883),
+    mqtt_user: str = Form(default=""),
+    mqtt_password: str = Form(default=""),
+    device_topic: str = Form(default="hlc20"),
+    discovery_prefix: str = Form(default="homeassistant"),
+):
+    if not mqtt_host:
+        return HTMLResponse('<span class="text-yellow-400 font-medium">⚠ Kein MQTT-Host angegeben</span>')
+    cfg = _c(request)
+    values = dict(_s(request).current_values)
+    if not values:
+        return HTMLResponse(
+            '<span class="text-yellow-400 font-medium">⚠ Noch keine Werte vorhanden – erst einmal erfolgreich pollen lassen</span>'
+        )
+    sample_cfg = Config(
+        mqtt_host=mqtt_host, mqtt_port=mqtt_port, mqtt_user=mqtt_user,
+        mqtt_password=mqtt_password, device_topic=device_topic, discovery_prefix=discovery_prefix,
+        sensors=cfg.sensors, params=cfg.params,
+    )
+    loop = asyncio.get_running_loop()
+    def _do() -> int:
+        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="hlc20_sample")
+        if mqtt_user:
+            client.username_pw_set(mqtt_user, mqtt_password)
+        client.connect(mqtt_host, mqtt_port, keepalive=10)
+        client.loop_start()
+        publish_discovery(client, sample_cfg)
+        publish_state_snapshot(client, sample_cfg, values)
+        client.loop_stop()
+        client.disconnect()
+        return len(values)
+    try:
+        count = await loop.run_in_executor(_executor, _do)
+        return HTMLResponse(
+            f'<span class="text-green-400 font-medium">✓ {count} Werte (letzte Abfrage) + Discovery an Home Assistant gesendet</span>'
+        )
+    except Exception as exc:
+        return HTMLResponse(
+            f'<span class="text-red-400 font-medium">✗ Fehler: {exc}</span>'
+        )
 
 
 @app.post("/api/test-serial", response_class=HTMLResponse)
