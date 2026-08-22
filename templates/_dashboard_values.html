@@ -15,10 +15,10 @@
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col gap-1 min-w-0">
           <span class="text-xs text-slate-400 truncate" title="{{ s.label }}">{{ s.label }}</span>
           {% if v %}
-            {% if kind == 'pump' %}
+            {% if kind != 'temp' %}
               <span class="mt-1 self-start px-2 py-0.5 rounded text-sm font-mono font-semibold
                            {% if v.value == 'ON' %}bg-green-900 text-green-300{% else %}bg-slate-700 text-slate-400{% endif %}">
-                {{ v.value }}
+                {% if kind == 'status' %}{{ 'Tag' if v.value == 'ON' else 'Nacht' }}{% else %}{{ v.value }}{% endif %}
               </span>
             {% else %}
               <span class="text-2xl font-mono font-bold text-slate-100 leading-none">

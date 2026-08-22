@@ -34,6 +34,9 @@ DEFAULT_SENSORS = [
     {"id": "pumpe_fbh",     "label": "Pumpe FBH",      "mod": 153, "kind": "pump", "error_raw": []},
     {"id": "pumpe_zirk",    "label": "Pumpe Zirk",     "mod": 83,  "kind": "pump", "error_raw": []},
     {"id": "pumpe_kessel",  "label": "Pumpe Kessel",   "mod": 8,   "kind": "pump", "error_raw": []},
+    # Betriebsstatus Schaltuhr (live aus Steuerung: 1 = Tagbetrieb aktiv)
+    {"id": "hk_tagbetrieb",  "label": "HK Tagbetrieb",  "mod": 42,  "kind": "status", "error_raw": []},
+    {"id": "fbh_tagbetrieb", "label": "FBH Tagbetrieb", "mod": 149, "kind": "status", "error_raw": []},
 ]
 
 DEFAULT_PARAMS = [

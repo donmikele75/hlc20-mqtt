@@ -36,8 +36,8 @@
             <td class="px-3 py-2 font-mono text-slate-300">{{ s.mod }}</td>
             <td class="px-3 py-2">
               <span class="text-xs px-2 py-0.5 rounded-full
-                           {% if s.kind == 'pump' %}bg-purple-900 text-purple-300{% else %}bg-blue-900 text-blue-300{% endif %}">
-                {{ 'Pumpe' if s.kind == 'pump' else 'Temperatur' }}
+                           {% if s.kind == 'pump' %}bg-purple-900 text-purple-300{% elif s.kind == 'status' %}bg-amber-900 text-amber-300{% else %}bg-blue-900 text-blue-300{% endif %}">
+                {% if s.kind == 'pump' %}Pumpe{% elif s.kind == 'status' %}Status{% else %}Temperatur{% endif %}
               </span>
             </td>
             <td class="px-3 py-2 font-mono text-xs text-slate-500">
@@ -138,6 +138,7 @@
                     class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
               <option value="temp">Temperatur</option>
               <option value="pump">Pumpe</option>
+              <option value="status">Status (Tag/Nacht)</option>
             </select>
           </div>
         </div>

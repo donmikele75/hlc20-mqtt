@@ -17,25 +17,33 @@ def hlc_open(host: str, port: int) -> tuple[serial.Serial, str | None]:
     return ser, resp.hex(" ").upper() if resp else None
 
 
+# Response frame: 15 <hi> <lo>  -> value is 16-bit BIG-ENDIAN (verified live on COM8).
+# 0xD8F1 (-9999) = module not configured; 0xFFFF (-1) = sensor open/error.
+_UNCONFIGURED = -9999
+
+
+def _decode(resp: bytes) -> int | None:
+    i = resp.find(0x15)
+    if i < 0 or i + 2 >= len(resp):
+        return None
+    raw = (resp[i + 1] << 8) | resp[i + 2]
+    raw = raw - 65536 if raw > 32767 else raw
+    return None if raw == _UNCONFIGURED else raw
+
+
 def hlc_read(ser: serial.Serial, mod: int) -> int | None:
-    """Read live module output (type F1, idx 0). Returns raw signed 16-bit LE."""
+    """Read live module output (type F1, idx 0). Returns raw signed 16-bit BE."""
     cmd = bytes([0x98, 0x00, mod & 0xFF, 0xF1, 0x00])
+    ser.reset_input_buffer()
     ser.write(cmd)
     time.sleep(READ_DELAY)
-    resp = ser.read(64)
-    if not resp or len(resp) < 3:
-        return None
-    raw = resp[1] | (resp[2] << 8)
-    return raw - 65536 if raw > 32767 else raw
+    return _decode(ser.read(64))
 
 
 def hlc_read_param(ser: serial.Serial, mod: int, idx: int) -> int | None:
-    """Read setting parameter (type 01). Returns raw signed 16-bit LE."""
+    """Read setting parameter (type 01). Returns raw signed 16-bit BE."""
     cmd = bytes([0x98, 0x00, mod & 0xFF, 0x01, idx & 0xFF])
+    ser.reset_input_buffer()
     ser.write(cmd)
     time.sleep(READ_DELAY)
-    resp = ser.read(64)
-    if not resp or len(resp) < 3:
-        return None
-    raw = resp[1] | (resp[2] << 8)
-    return raw - 65536 if raw > 32767 else raw
+    return _decode(ser.read(64))
