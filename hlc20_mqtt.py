@@ -70,6 +70,31 @@ SENSORS = [
     {"id": "pumpe_kessel",  "label": "Pumpe Kessel",    "mod": 8,   "kind": "pump", "error_raw": []},
 ]
 
+# ─── Parameter-Definitionen (Einstellwerte, Typ 0x01) ───────────────────────
+# Moduladressen aus .hlc-Analyse + live Verifikation gegen Display.
+# unit: "°C" → Temperatur, "K" → Temperaturdifferenz, "" → dimensionslos
+PARAMS = [
+    # HK Heizkurve (mod=28)
+    {"id": "hk_nullpunkt",   "label": "HK Nullpunkt",          "mod": 28,  "idx": 0, "unit": "°C"},
+    {"id": "hk_steigung",    "label": "HK Heizkurve Steigung",  "mod": 28,  "idx": 1, "unit": ""},
+    {"id": "hk_max_soll",    "label": "HK Max Solltemp",        "mod": 28,  "idx": 2, "unit": "°C"},
+    {"id": "hk_raumsoll",    "label": "HK Raumsoll",            "mod": 28,  "idx": 3, "unit": "°C"},
+    {"id": "hk_nachtabs",    "label": "HK Nachtabsenkung",      "mod": 28,  "idx": 5, "unit": "K"},
+    {"id": "hk_max_aussen",  "label": "HK Max Außentemp",       "mod": 28,  "idx": 9, "unit": "°C"},
+    # FBH Heizkurve (mod=143)
+    {"id": "fbh_nullpunkt",  "label": "FBH Nullpunkt",          "mod": 143, "idx": 0, "unit": "°C"},
+    {"id": "fbh_steigung",   "label": "FBH Heizkurve Steigung", "mod": 143, "idx": 1, "unit": ""},
+    {"id": "fbh_max_soll",   "label": "FBH Max Solltemp",       "mod": 143, "idx": 2, "unit": "°C"},
+    {"id": "fbh_raumsoll",   "label": "FBH Raumsoll",           "mod": 143, "idx": 3, "unit": "°C"},
+    {"id": "fbh_nachtabs",   "label": "FBH Nachtabsenkung",     "mod": 143, "idx": 5, "unit": "K"},
+    {"id": "fbh_max_aussen", "label": "FBH Max Außentemp",      "mod": 143, "idx": 9, "unit": "°C"},
+    # Betrieb
+    {"id": "temp_nacht_ein", "label": "TempNacht ein",          "mod": 60,  "idx": 0, "unit": "°C"},
+    {"id": "min_pu_hk_ein",  "label": "MinPu-HK-ein",           "mod": 66,  "idx": 0, "unit": "°C"},
+    {"id": "zirk_min_ein",   "label": "Zirk-Min ein",           "mod": 88,  "idx": 0, "unit": "°C"},
+    {"id": "zirk_max_aus",   "label": "Zirk-Max-aus",           "mod": 82,  "idx": 0, "unit": "°C"},
+]
+
 DEVICE_INFO = {
     "identifiers":  ["hanazeder_hlc20"],
     "name":         "Hanazeder HLC-20",
@@ -103,7 +128,19 @@ def hlc_read(ser: serial.Serial, mod: int) -> int | None:
     resp = ser.read(64)
     if not resp or len(resp) < 3:
         return None
-    raw = (resp[1] << 8) | resp[2]
+    raw = resp[1] | (resp[2] << 8)  # little-endian
+    return raw - 65536 if raw > 32767 else raw
+
+
+def hlc_read_param(ser: serial.Serial, mod: int, idx: int) -> int | None:
+    """Liest Einstellungsparameter (Typ 0x01, fester Index). Gibt rohen 16-bit-Signed-Wert zurück."""
+    cmd = bytes([0x98, 0x00, mod & 0xFF, 0x01, idx & 0xFF])
+    ser.write(cmd)
+    time.sleep(READ_DELAY)
+    resp = ser.read(64)
+    if not resp or len(resp) < 3:
+        return None
+    raw = resp[1] | (resp[2] << 8)  # little-endian
     return raw - 65536 if raw > 32767 else raw
 
 
@@ -145,7 +182,28 @@ def publish_discovery(client: mqtt.Client) -> None:
         client.publish(discovery_topic, json.dumps(config), retain=True)
         log.debug("Discovery: %s", discovery_topic)
 
-    log.info("MQTT Auto-Discovery für %d Sensoren veröffentlicht", len(SENSORS))
+    for p in PARAMS:
+        pid   = p["id"]
+        unit  = p["unit"]
+        state_topic = f"{DEVICE_TOPIC}/sensor/{pid}"
+        config: dict = {
+            "name":        p["label"],
+            "unique_id":   f"hlc20_{pid}",
+            "state_topic": state_topic,
+            "state_class": "measurement",
+            "device":      DEVICE_INFO,
+        }
+        if unit == "°C":
+            config["unit_of_measurement"] = "°C"
+            config["device_class"]        = "temperature"
+        elif unit:
+            config["unit_of_measurement"] = unit
+        discovery_topic = f"{DISCOVERY_PREFIX}/sensor/hlc20_{pid}/config"
+        client.publish(discovery_topic, json.dumps(config), retain=True)
+        log.debug("Discovery: %s", discovery_topic)
+
+    log.info("MQTT Auto-Discovery für %d Sensoren + %d Parameter veröffentlicht",
+             len(SENSORS), len(PARAMS))
 
 
 # ─── Polling-Schleife ─────────────────────────────────────────────────────────
@@ -180,6 +238,22 @@ def poll_and_publish(ser: serial.Serial, client: mqtt.Client) -> int:
             topic = f"{DEVICE_TOPIC}/binary_sensor/{s['id']}"
             client.publish(topic, state)
             log.debug("%-20s %s (raw=%d)", s["id"], state, raw)
+
+    for p in PARAMS:
+        try:
+            raw = hlc_read_param(ser, p["mod"], p["idx"])
+        except Exception as exc:
+            log.error("Lesefehler Param %s: %s", p["id"], exc)
+            errors += 1
+            continue
+        if raw is None:
+            log.warning("Keine Antwort: %s (Mod %d Idx %d)", p["id"], p["mod"], p["idx"])
+            errors += 1
+            continue
+        value = round(raw / 10.0, 1)
+        topic = f"{DEVICE_TOPIC}/sensor/{p['id']}"
+        client.publish(topic, str(value))
+        log.debug("%-20s %.1f", p["id"], value)
 
     return errors
 
@@ -233,8 +307,8 @@ def main() -> None:
 
         try:
             errors = poll_and_publish(ser, client)
-            log.info("Poll abgeschlossen – %d Sensoren, %d Fehler",
-                     len(SENSORS), errors)
+            log.info("Poll abgeschlossen – %d Sensoren + %d Parameter, %d Fehler",
+                     len(SENSORS), len(PARAMS), errors)
             if errors > len(SENSORS) // 2:
                 # Zu viele Fehler → Verbindung neu aufbauen
                 log.warning("Zu viele Fehler – Serielle Verbindung wird neu aufgebaut")

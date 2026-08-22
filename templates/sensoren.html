@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block title %}Sensoren{% endblock %}
+
+{% block content %}
+<div x-data="sensoren()" class="space-y-8">
+
+  {# ── Live-Sensoren ─────────────────────────────────────────────────────── #}
+  <section>
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold">Live-Sensoren
+        <span class="ml-2 text-sm font-normal text-slate-500">(Typ 0xF1)</span>
+      </h2>
+      <button @click="openSensorModal()"
+              class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition-colors">
+        + Sensor
+      </button>
+    </div>
+
+    <div class="overflow-x-auto rounded-xl border border-slate-700">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-800 text-xs text-slate-400 uppercase tracking-wider">
+          <tr>
+            <th class="px-3 py-2.5 text-left">ID</th>
+            <th class="px-3 py-2.5 text-left">Label</th>
+            <th class="px-3 py-2.5 text-left">Mod</th>
+            <th class="px-3 py-2.5 text-left">Art</th>
+            <th class="px-3 py-2.5 text-left">Fehler-Roh</th>
+            <th class="px-3 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+          {% for s in sensors %}
+          <tr class="hover:bg-slate-800/50">
+            <td class="px-3 py-2 font-mono text-xs text-slate-400">{{ s.id }}</td>
+            <td class="px-3 py-2 text-slate-100">{{ s.label }}</td>
+            <td class="px-3 py-2 font-mono text-slate-300">{{ s.mod }}</td>
+            <td class="px-3 py-2">
+              <span class="text-xs px-2 py-0.5 rounded-full
+                           {% if s.kind == 'pump' %}bg-purple-900 text-purple-300{% else %}bg-blue-900 text-blue-300{% endif %}">
+                {{ 'Pumpe' if s.kind == 'pump' else 'Temperatur' }}
+              </span>
+            </td>
+            <td class="px-3 py-2 font-mono text-xs text-slate-500">
+              {{ s.error_raw | join(', ') if s.error_raw else '—' }}
+            </td>
+            <td class="px-3 py-2 text-right">
+              <div class="flex justify-end gap-2">
+                <button @click='openSensorModal({{ s | tojson }})'
+                        class="text-xs text-slate-400 hover:text-slate-100 transition-colors">Bearbeiten</button>
+                <button @click="deleteSensor('{{ s.id }}')"
+                        class="text-xs text-red-500 hover:text-red-400 transition-colors">Löschen</button>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="px-3 py-6 text-center text-slate-600">Keine Sensoren konfiguriert</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {# ── Einstellparameter ─────────────────────────────────────────────────── #}
+  <section>
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold">Einstellparameter
+        <span class="ml-2 text-sm font-normal text-slate-500">(Typ 0x01)</span>
+      </h2>
+      <button @click="openParamModal()"
+              class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition-colors">
+        + Parameter
+      </button>
+    </div>
+
+    <div class="overflow-x-auto rounded-xl border border-slate-700">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-800 text-xs text-slate-400 uppercase tracking-wider">
+          <tr>
+            <th class="px-3 py-2.5 text-left">ID</th>
+            <th class="px-3 py-2.5 text-left">Label</th>
+            <th class="px-3 py-2.5 text-left">Mod</th>
+            <th class="px-3 py-2.5 text-left">Idx</th>
+            <th class="px-3 py-2.5 text-left">Einheit</th>
+            <th class="px-3 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+          {% for p in params %}
+          <tr class="hover:bg-slate-800/50">
+            <td class="px-3 py-2 font-mono text-xs text-slate-400">{{ p.id }}</td>
+            <td class="px-3 py-2 text-slate-100">{{ p.label }}</td>
+            <td class="px-3 py-2 font-mono text-slate-300">{{ p.mod }}</td>
+            <td class="px-3 py-2 font-mono text-slate-300">{{ p.idx }}</td>
+            <td class="px-3 py-2 text-slate-400">{{ p.unit if p.unit else '—' }}</td>
+            <td class="px-3 py-2 text-right">
+              <div class="flex justify-end gap-2">
+                <button @click='openParamModal({{ p | tojson }})'
+                        class="text-xs text-slate-400 hover:text-slate-100 transition-colors">Bearbeiten</button>
+                <button @click="deleteParam('{{ p.id }}')"
+                        class="text-xs text-red-500 hover:text-red-400 transition-colors">Löschen</button>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="px-3 py-6 text-center text-slate-600">Keine Parameter konfiguriert</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {# ── Sensor-Modal ──────────────────────────────────────────────────────── #}
+  <div x-show="sensorModal" x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+    <div @click.outside="sensorModal=false"
+         class="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl fade-in">
+      <h3 class="text-lg font-semibold mb-4" x-text="sensorForm.id ? 'Sensor bearbeiten' : 'Sensor hinzufügen'"></h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">ID</label>
+          <input x-model="sensorForm.id" type="text" :disabled="!!sensorForm._edit"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Label</label>
+          <input x-model="sensorForm.label" type="text"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+        <div class="flex gap-3">
+          <div class="flex-1">
+            <label class="block text-xs text-slate-400 mb-1">Modul</label>
+            <input x-model.number="sensorForm.mod" type="number" min="0" max="255"
+                   class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+          </div>
+          <div class="flex-1">
+            <label class="block text-xs text-slate-400 mb-1">Art</label>
+            <select x-model="sensorForm.kind"
+                    class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <option value="temp">Temperatur</option>
+              <option value="pump">Pumpe</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Fehler-Rohwerte (kommasepariert)</label>
+          <input x-model="sensorForm.error_raw" type="text" placeholder="z.B. 4000, -1"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+        <div x-show="formError" class="text-red-400 text-sm" x-text="formError"></div>
+      </div>
+      <div class="flex justify-end gap-3 mt-5">
+        <button @click="sensorModal=false"
+                class="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-100">Abbrechen</button>
+        <button @click="saveSensor()"
+                class="px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+          Speichern
+        </button>
+      </div>
+    </div>
+  </div>
+
+  {# ── Param-Modal ───────────────────────────────────────────────────────── #}
+  <div x-show="paramModal" x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+    <div @click.outside="paramModal=false"
+         class="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl fade-in">
+      <h3 class="text-lg font-semibold mb-4" x-text="paramForm.id ? 'Parameter bearbeiten' : 'Parameter hinzufügen'"></h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">ID</label>
+          <input x-model="paramForm.id" type="text" :disabled="!!paramForm._edit"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Label</label>
+          <input x-model="paramForm.label" type="text"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+        <div class="flex gap-3">
+          <div class="flex-1">
+            <label class="block text-xs text-slate-400 mb-1">Modul</label>
+            <input x-model.number="paramForm.mod" type="number" min="0" max="255"
+                   class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+          </div>
+          <div class="flex-1">
+            <label class="block text-xs text-slate-400 mb-1">Index</label>
+            <input x-model.number="paramForm.idx" type="number" min="0" max="255"
+                   class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+          </div>
+          <div class="flex-1">
+            <label class="block text-xs text-slate-400 mb-1">Einheit</label>
+            <input x-model="paramForm.unit" type="text" placeholder="°C, K, …"
+                   class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+          </div>
+        </div>
+        <div x-show="formError" class="text-red-400 text-sm" x-text="formError"></div>
+      </div>
+      <div class="flex justify-end gap-3 mt-5">
+        <button @click="paramModal=false"
+                class="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-100">Abbrechen</button>
+        <button @click="saveParam()"
+                class="px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+          Speichern
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function sensoren() {
+  return {
+    sensorModal: false,
+    sensorForm: {},
+    paramModal: false,
+    paramForm: {},
+    formError: '',
+
+    openSensorModal(s) {
+      this.formError = '';
+      if (s) {
+        this.sensorForm = {
+          _edit: true, id: s.id, label: s.label, mod: s.mod,
+          kind: s.kind, error_raw: (s.error_raw || []).join(', '),
+        };
+      } else {
+        this.sensorForm = { id: '', label: '', mod: 0, kind: 'temp', error_raw: '' };
+      }
+      this.sensorModal = true;
+    },
+
+    async saveSensor() {
+      this.formError = '';
+      const fd = new FormData();
+      fd.append('sid',       this.sensorForm.id);
+      fd.append('label',     this.sensorForm.label);
+      fd.append('mod',       this.sensorForm.mod);
+      fd.append('kind',      this.sensorForm.kind);
+      fd.append('error_raw', this.sensorForm.error_raw || '');
+      const url = this.sensorForm._edit
+        ? `/api/sensors/${this.sensorForm.id}/update`
+        : '/api/sensors/add';
+      const r = await fetch(url, { method: 'POST', body: fd });
+      if (r.ok) { location.reload(); } else { this.formError = (await r.json()).detail || 'Fehler'; }
+    },
+
+    async deleteSensor(sid) {
+      if (!confirm('Sensor "' + sid + '" löschen?')) return;
+      await fetch('/api/sensors/' + sid, { method: 'DELETE' });
+      location.reload();
+    },
+
+    openParamModal(p) {
+      this.formError = '';
+      if (p) {
+        this.paramForm = {
+          _edit: true, id: p.id, label: p.label,
+          mod: p.mod, idx: p.idx, unit: p.unit || '',
+        };
+      } else {
+        this.paramForm = { id: '', label: '', mod: 0, idx: 0, unit: '°C' };
+      }
+      this.paramModal = true;
+    },
+
+    async saveParam() {
+      this.formError = '';
+      const fd = new FormData();
+      fd.append('pid',   this.paramForm.id);
+      fd.append('label', this.paramForm.label);
+      fd.append('mod',   this.paramForm.mod);
+      fd.append('idx',   this.paramForm.idx);
+      fd.append('unit',  this.paramForm.unit);
+      const url = this.paramForm._edit
+        ? `/api/params/${this.paramForm.id}/update`
+        : '/api/params/add';
+      const r = await fetch(url, { method: 'POST', body: fd });
+      if (r.ok) { location.reload(); } else { this.formError = (await r.json()).detail || 'Fehler'; }
+    },
+
+    async deleteParam(pid) {
+      if (!confirm('Parameter "' + pid + '" löschen?')) return;
+      await fetch('/api/params/' + pid, { method: 'DELETE' });
+      location.reload();
+    },
+  };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Einstellungen{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold mb-6">Einstellungen</h1>
+
+<div class="space-y-6 max-w-2xl">
+
+  {# ── Seriell-Server ───────────────────────────────────────────────────── #}
+  <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+    <h2 class="text-base font-semibold mb-4 text-slate-100">Seriell-Server</h2>
+    <form id="form-serial" class="space-y-4">
+      <div class="flex gap-4">
+        <div class="flex-1">
+          <label class="block text-xs text-slate-400 mb-1">Host / IP</label>
+          <input name="serial_host" type="text" value="{{ cfg.serial_host }}"
+                 placeholder="z.B. 10.1.1.57"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+        <div class="w-28">
+          <label class="block text-xs text-slate-400 mb-1">Port</label>
+          <input name="serial_port" type="number" value="{{ cfg.serial_port }}"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <button type="button"
+                hx-post="/api/test-serial"
+                hx-include="#form-serial"
+                hx-target="#serial-test-result"
+                hx-indicator="#serial-test-spin"
+                class="text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg transition-colors">
+          Verbindung testen
+        </button>
+        <svg id="serial-test-spin"
+             class="htmx-indicator w-4 h-4 animate-spin text-blue-400"
+             fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+        <span id="serial-test-result" class="text-sm"></span>
+      </div>
+      <p class="text-xs text-slate-600">
+        Hinweis: Der Test kann fehlschlagen wenn der Poller bereits verbunden ist.
+      </p>
+    </form>
+  </div>
+
+  {# ── MQTT ─────────────────────────────────────────────────────────────── #}
+  <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+    <h2 class="text-base font-semibold mb-4 text-slate-100">MQTT-Broker</h2>
+    <form id="form-mqtt" class="space-y-4">
+      <div class="flex gap-4">
+        <div class="flex-1">
+          <label class="block text-xs text-slate-400 mb-1">Host / IP</label>
+          <input name="mqtt_host" type="text" value="{{ cfg.mqtt_host }}"
+                 placeholder="z.B. 192.168.1.10"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+        <div class="w-28">
+          <label class="block text-xs text-slate-400 mb-1">Port</label>
+          <input name="mqtt_port" type="number" value="{{ cfg.mqtt_port }}"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+      </div>
+      <div class="flex gap-4">
+        <div class="flex-1">
+          <label class="block text-xs text-slate-400 mb-1">Benutzer</label>
+          <input name="mqtt_user" type="text" value="{{ cfg.mqtt_user }}"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+        <div class="flex-1">
+          <label class="block text-xs text-slate-400 mb-1">Passwort</label>
+          <input name="mqtt_password" type="password" value="{{ cfg.mqtt_password }}"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+      </div>
+    </form>
+  </div>
+
+  {# ── Allgemein ─────────────────────────────────────────────────────────── #}
+  <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+    <h2 class="text-base font-semibold mb-4 text-slate-100">Allgemein</h2>
+    <form id="form-general" class="space-y-4">
+      <div class="flex gap-4 flex-wrap">
+        <div class="w-36">
+          <label class="block text-xs text-slate-400 mb-1">Poll-Intervall (s)</label>
+          <input name="poll_interval" type="number" value="{{ cfg.poll_interval }}" min="10"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+        <div class="flex-1 min-w-40">
+          <label class="block text-xs text-slate-400 mb-1">Device-Topic</label>
+          <input name="device_topic" type="text" value="{{ cfg.device_topic }}"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+        <div class="flex-1 min-w-40">
+          <label class="block text-xs text-slate-400 mb-1">Discovery-Prefix</label>
+          <input name="discovery_prefix" type="text" value="{{ cfg.discovery_prefix }}"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+      </div>
+    </form>
+  </div>
+
+  {# ── Save all ─────────────────────────────────────────────────────────── #}
+  <div class="flex items-center gap-4">
+    <button hx-post="/api/einstellungen"
+            hx-include="#form-serial, #form-mqtt, #form-general"
+            hx-target="#save-result"
+            hx-indicator="#save-spin"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+      Speichern
+    </button>
+    <svg id="save-spin"
+         class="htmx-indicator w-4 h-4 animate-spin text-blue-400"
+         fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+      <path class="opacity-75" fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+    </svg>
+    <span id="save-result" class="text-sm"></span>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+{% block title %}Bus-Monitor{% endblock %}
+
+{% block content %}
+<div x-data="busMonitor()" x-init="init()" class="space-y-4">
+
+  {# ── Toolbar ────────────────────────────────────────────────────────────── #}
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-xl font-semibold text-slate-100">Bus-Monitor</h1>
+
+    <div class="flex items-center gap-2 flex-wrap">
+      {# WS status #}
+      <span class="text-xs px-2 py-1 rounded-full font-medium"
+            :class="connected ? 'bg-green-950 text-green-400' : 'bg-red-950 text-red-400'">
+        <span class="w-1.5 h-1.5 rounded-full inline-block mr-1"
+              :class="connected ? 'bg-green-400' : 'bg-red-400'"></span>
+        <span x-text="connected ? 'Verbunden' : 'Getrennt'"></span>
+      </span>
+
+      {# Mode toggle #}
+      <div class="flex rounded-lg border border-slate-700 overflow-hidden text-sm">
+        <button @click="mode='live'; clearEntries()"
+                :class="mode==='live' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-100'"
+                class="px-3 py-1.5 transition-colors">Live</button>
+        <button @click="mode='scan'"
+                :class="mode==='scan' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-100'"
+                class="px-3 py-1.5 transition-colors">Scan</button>
+      </div>
+
+      {# Filter #}
+      <select x-model="filter"
+              class="text-sm bg-slate-800 border border-slate-700 text-slate-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        <option value="all">Alle</option>
+        <option value="active">Mit Wert</option>
+        <option value="known">Bekannte</option>
+        <option value="unknown">Unbekannte</option>
+      </select>
+
+      {# Scan controls #}
+      <template x-if="!scanning">
+        <button @click="startScan()"
+                class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition-colors">
+          Scan starten
+        </button>
+      </template>
+      <template x-if="scanning">
+        <button @click="stopScan()"
+                class="text-sm bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors">
+          Scan stoppen
+        </button>
+      </template>
+    </div>
+  </div>
+
+  {# ── Scan progress ──────────────────────────────────────────────────────── #}
+  <div x-show="scanning || (mode==='scan' && scanProgress > 0)" x-cloak class="space-y-1">
+    <div class="flex justify-between text-xs text-slate-400">
+      <span>Mod <span x-text="scanMod"></span> / 255</span>
+      <span x-text="scanProgress + '%'"></span>
+    </div>
+    <div class="w-full bg-slate-800 rounded-full h-2">
+      <div class="bg-blue-500 h-2 rounded-full transition-all duration-200"
+           :style="'width:' + scanProgress + '%'"></div>
+    </div>
+  </div>
+
+  {# ── Stats bar ──────────────────────────────────────────────────────────── #}
+  <div class="flex items-center gap-4 text-xs text-slate-500">
+    <span><span class="font-mono text-slate-300" x-text="filteredEntries.length"></span> Einträge</span>
+    <span x-show="lastPollTs">letzter Poll: <span class="font-mono text-slate-300" x-text="lastPollTs"></span></span>
+    <span x-show="mode==='scan' && !scanning && Object.keys(entriesMap).length > 0"
+          class="text-green-500">
+      ✓ Scan abgeschlossen
+    </span>
+  </div>
+
+  {# ── Table ──────────────────────────────────────────────────────────────── #}
+  <div class="overflow-x-auto rounded-xl border border-slate-700">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-800 text-xs text-slate-400 uppercase tracking-wider">
+        <tr>
+          <th class="px-3 py-2.5 text-left">Mod</th>
+          <th class="px-3 py-2.5 text-left">Idx</th>
+          <th class="px-3 py-2.5 text-left">Hex</th>
+          <th class="px-3 py-2.5 text-right">Wert</th>
+          <th class="px-3 py-2.5 text-left">Label</th>
+          <th class="px-3 py-2.5 text-left">Zeit</th>
+          <th class="px-3 py-2.5 text-left">Aktion</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800">
+        <template x-if="filteredEntries.length === 0">
+          <tr>
+            <td colspan="7" class="px-3 py-8 text-center text-slate-600">
+              <template x-if="mode === 'live'">
+                <span>Warte auf ersten Poll-Zyklus…</span>
+              </template>
+              <template x-if="mode === 'scan'">
+                <span>Scan starten um Module zu erkunden</span>
+              </template>
+            </td>
+          </tr>
+        </template>
+        <template x-for="e in filteredEntries" :key="e.key">
+          <tr class="hover:bg-slate-800/50 transition-colors"
+              :class="{ 'opacity-60': !e.has_value }">
+            <td class="px-3 py-2 font-mono text-slate-300">
+              <span x-text="e.mod !== undefined && e.mod !== null ? e.mod : '?'"></span>
+            </td>
+            <td class="px-3 py-2 font-mono text-slate-500">
+              <span x-text="e.idx !== undefined ? e.idx : '-'"></span>
+            </td>
+            <td class="px-3 py-2 font-mono text-slate-500 text-xs">
+              <span x-text="e.hex || '--'"></span>
+            </td>
+            <td class="px-3 py-2 font-mono text-right">
+              <template x-if="e.kind === 'pump'">
+                <span class="px-1.5 py-0.5 rounded text-xs font-semibold"
+                      :class="e.value === 'ON' ? 'bg-green-900 text-green-300' : 'bg-slate-700 text-slate-400'"
+                      x-text="e.value"></span>
+              </template>
+              <template x-if="e.kind !== 'pump'">
+                <span class="text-slate-100" x-text="e.value"></span>
+              </template>
+              <span class="text-slate-500 ml-0.5 text-xs" x-text="e.unit || ''"></span>
+            </td>
+            <td class="px-3 py-2 max-w-[180px]">
+              <template x-if="e.label">
+                <span class="text-blue-400" x-text="e.label"></span>
+              </template>
+              <template x-if="!e.label">
+                <span class="text-slate-600 italic">unbekannt</span>
+              </template>
+            </td>
+            <td class="px-3 py-2 text-slate-500 font-mono text-xs">
+              <span x-text="formatTime(e.ts)"></span>
+            </td>
+            <td class="px-3 py-2">
+              <template x-if="e.has_value && !e.label">
+                <button @click="openAddModal(e)"
+                        class="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2">
+                  + Hinzufügen
+                </button>
+              </template>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+
+  {# ── Add-as-sensor/param modal ──────────────────────────────────────────── #}
+  <div x-show="modalOpen" x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+    <div @click.outside="closeModal()"
+         class="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl fade-in">
+      <h2 class="text-lg font-semibold mb-4">Als Sensor hinzufügen</h2>
+
+      <div class="flex rounded-lg border border-slate-700 overflow-hidden text-sm mb-4">
+        <button @click="modalKind='sensor'"
+                :class="modalKind==='sensor' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-100'"
+                class="flex-1 py-1.5 transition-colors">Live-Sensor</button>
+        <button @click="modalKind='param'"
+                :class="modalKind==='param' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-100'"
+                class="flex-1 py-1.5 transition-colors">Einstellparameter</button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">ID</label>
+          <input x-model="modalForm.id" type="text"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Label</label>
+          <input x-model="modalForm.label" type="text"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+        <div class="flex gap-3">
+          <div class="flex-1">
+            <label class="block text-xs text-slate-400 mb-1">Modul</label>
+            <input x-model.number="modalForm.mod" type="number" min="0" max="255"
+                   class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+          </div>
+          <template x-if="modalKind === 'sensor'">
+            <div class="flex-1">
+              <label class="block text-xs text-slate-400 mb-1">Art</label>
+              <select x-model="modalForm.kind"
+                      class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <option value="temp">Temperatur</option>
+                <option value="pump">Pumpe</option>
+              </select>
+            </div>
+          </template>
+          <template x-if="modalKind === 'param'">
+            <div class="flex-1">
+              <label class="block text-xs text-slate-400 mb-1">Index</label>
+              <input x-model.number="modalForm.idx" type="number" min="0" max="255"
+                     class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+            </div>
+          </template>
+        </div>
+        <template x-if="modalKind === 'param'">
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Einheit</label>
+            <input x-model="modalForm.unit" type="text" placeholder="°C, K, …"
+                   class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+          </div>
+        </template>
+
+        <div x-show="modalError" x-cloak
+             class="text-red-400 text-sm" x-text="modalError"></div>
+      </div>
+
+      <div class="flex justify-end gap-3 mt-6">
+        <button @click="closeModal()"
+                class="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-100 transition-colors">
+          Abbrechen
+        </button>
+        <button @click="submitModal()"
+                class="px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+          Hinzufügen
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function busMonitor() {
+  return {
+    ws: null,
+    connected: false,
+    mode: 'live',
+    filter: 'all',
+    entriesMap: {},
+    scanning: false,
+    scanProgress: 0,
+    scanMod: 0,
+    lastPollTs: '',
+    modalOpen: false,
+    modalKind: 'sensor',
+    modalForm: { id: '', label: '', mod: 0, kind: 'temp', idx: 0, unit: '°C' },
+    modalEntry: null,
+    modalError: '',
+
+    init() { this.connectWS(); },
+
+    connectWS() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      this.ws = new WebSocket(`${proto}//${location.host}/ws/bus-monitor`);
+      this.ws.onopen  = () => { this.connected = true; };
+      this.ws.onclose = () => { this.connected = false; setTimeout(() => this.connectWS(), 3000); };
+      this.ws.onerror = () => { this.connected = false; };
+      this.ws.onmessage = (e) => { try { this.onMsg(JSON.parse(e.data)); } catch {} };
+    },
+
+    onMsg(m) {
+      if (m.type === 'update' && this.mode === 'live') {
+        this.entriesMap['s_' + m.id] = {
+          key: 's_' + m.id, kind: m.kind, id: m.id, label: m.label,
+          value: m.value, unit: m.unit || '', raw: m.raw, hex: m.hex || '--',
+          mod: m.mod, idx: m.idx, ts: m.ts, has_value: true,
+        };
+      } else if (m.type === 'scan_started') {
+        this.scanning = true; this.scanProgress = 0; this.scanMod = 0;
+        this.entriesMap = {}; this.mode = 'scan';
+      } else if (m.type === 'scan_result') {
+        this.scanMod = m.mod; this.scanProgress = m.pct;
+        if (m.has_value) {
+          this.entriesMap['m_' + m.mod] = {
+            key: 'm_' + m.mod, kind: 'scan', id: m.label || '',
+            label: m.label || '', mod: m.mod, raw: m.raw, hex: m.hex,
+            value: m.value !== null ? String(m.value) : '--', unit: '°C',
+            has_value: true, ts: m.ts, idx: undefined,
+          };
+        }
+      } else if (m.type === 'scan_complete' || m.type === 'scan_stopped') {
+        this.scanning = false; this.scanProgress = 100;
+      } else if (m.type === 'poll_complete') {
+        this.lastPollTs = m.ts ? new Date(m.ts).toLocaleTimeString('de-DE') : '';
+      }
+    },
+
+    get filteredEntries() {
+      return Object.values(this.entriesMap)
+        .filter(e => {
+          if (this.filter === 'active')  return e.has_value;
+          if (this.filter === 'known')   return !!(e.label || e.id);
+          if (this.filter === 'unknown') return !(e.label || e.id);
+          return true;
+        })
+        .sort((a, b) => {
+          const am = typeof a.mod === 'number' ? a.mod : 999;
+          const bm = typeof b.mod === 'number' ? b.mod : 999;
+          return am !== bm ? am - bm : String(a.id).localeCompare(String(b.id));
+        });
+    },
+
+    clearEntries() { this.entriesMap = {}; },
+
+    startScan() {
+      fetch('/api/scan/start', { method: 'POST' });
+    },
+    stopScan() {
+      fetch('/api/scan/stop', { method: 'POST' });
+    },
+
+    openAddModal(e) {
+      this.modalEntry = e;
+      this.modalKind  = 'sensor';
+      this.modalError = '';
+      this.modalForm  = {
+        id:    e.id || ('mod' + e.mod),
+        label: e.label || ('Modul ' + e.mod),
+        mod:   e.mod,
+        kind:  'temp',
+        idx:   0,
+        unit:  '°C',
+      };
+      this.modalOpen = true;
+    },
+    closeModal() { this.modalOpen = false; this.modalError = ''; },
+
+    async submitModal() {
+      this.modalError = '';
+      const fd = new FormData();
+      if (this.modalKind === 'sensor') {
+        fd.append('sid',   this.modalForm.id);
+        fd.append('label', this.modalForm.label);
+        fd.append('mod',   this.modalForm.mod);
+        fd.append('kind',  this.modalForm.kind);
+        fd.append('error_raw', '');
+        const r = await fetch('/api/sensors/add', { method: 'POST', body: fd });
+        if (r.ok) { this.closeModal(); window.location.href = '/sensoren'; return; }
+        this.modalError = (await r.json()).detail || 'Fehler';
+      } else {
+        fd.append('pid',   this.modalForm.id);
+        fd.append('label', this.modalForm.label);
+        fd.append('mod',   this.modalForm.mod);
+        fd.append('idx',   this.modalForm.idx);
+        fd.append('unit',  this.modalForm.unit);
+        const r = await fetch('/api/params/add', { method: 'POST', body: fd });
+        if (r.ok) { this.closeModal(); window.location.href = '/sensoren'; return; }
+        this.modalError = (await r.json()).detail || 'Fehler';
+      }
+    },
+
+    formatTime(ts) {
+      if (!ts) return '--';
+      try { return new Date(ts).toLocaleTimeString('de-DE'); } catch { return ts.slice(11,19); }
+    },
+  };
+}
+</script>
+{% endblock %}

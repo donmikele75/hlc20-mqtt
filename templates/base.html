@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="de" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}HLC-20{% endblock %} · Hanazeder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: { slate: { 950: '#0a0f1e' } } } }
+    }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.0/dist/htmx.min.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .fade-in { animation: fadeIn .3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-full" x-data="{ nav: false }">
+
+  <nav class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4">
+      <div class="flex items-center justify-between h-14">
+
+        <div class="flex items-center gap-6">
+          <a href="/" class="font-bold text-blue-400 text-lg tracking-tight select-none">HLC-20</a>
+          <div class="hidden md:flex items-center gap-1 text-sm">
+            {% set nav_items = [
+              ('/', 'dashboard',    'Dashboard'),
+              ('/bus-monitor', 'bus_monitor', 'Bus-Monitor'),
+              ('/sensoren',    'sensoren',    'Sensoren'),
+              ('/einstellungen','einstellungen','Einstellungen'),
+            ] %}
+            {% for href, key, label in nav_items %}
+            <a href="{{ href }}"
+               class="px-3 py-1.5 rounded-md transition-colors
+                      {% if active_page == key %}text-blue-400 bg-slate-800{% else %}text-slate-400 hover:text-slate-100 hover:bg-slate-800{% endif %}">
+              {{ label }}
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <div id="status-badges"
+               hx-get="/api/status-html"
+               hx-trigger="load, every 15s"
+               hx-swap="outerHTML">
+            <span class="text-xs text-slate-600">…</span>
+          </div>
+          <button @click="nav = !nav"
+                  class="md:hidden p-1.5 rounded text-slate-400 hover:text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div x-show="nav" x-cloak
+           class="md:hidden pb-3 border-t border-slate-800 pt-2 space-y-0.5 text-sm">
+        {% for href, key, label in [
+          ('/', 'dashboard', 'Dashboard'),
+          ('/bus-monitor', 'bus_monitor', 'Bus-Monitor'),
+          ('/sensoren', 'sensoren', 'Sensoren'),
+          ('/einstellungen', 'einstellungen', 'Einstellungen'),
+        ] %}
+        <a href="{{ href }}"
+           class="block px-3 py-2 rounded text-slate-300 hover:text-white hover:bg-slate-800">
+          {{ label }}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>
