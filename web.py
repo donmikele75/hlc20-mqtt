@@ -449,6 +449,7 @@ async def publish_sample(
             client.username_pw_set(mqtt_user, mqtt_password)
         client.connect(mqtt_host, mqtt_port, keepalive=10)
         client.loop_start()
+        client.publish(f"{device_topic}/status", "online", retain=True)
         publish_discovery(client, sample_cfg)
         publish_state_snapshot(client, sample_cfg, values)
         client.loop_stop()

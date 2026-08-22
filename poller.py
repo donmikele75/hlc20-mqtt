@@ -32,6 +32,7 @@ def publish_discovery(client: mqtt.Client, cfg: Config) -> None:
             disc = {
                 "name": label, "unique_id": f"hlc20_{sid}",
                 "state_topic": f"{cfg.device_topic}/sensor/{sid}",
+                "availability_topic": f"{cfg.device_topic}/status",
                 "unit_of_measurement": "°C", "device_class": "temperature",
                 "state_class": "measurement", "device": _DEVICE_INFO,
             }
@@ -42,6 +43,7 @@ def publish_discovery(client: mqtt.Client, cfg: Config) -> None:
             disc = {
                 "name": label, "unique_id": f"hlc20_{sid}",
                 "state_topic": f"{cfg.device_topic}/binary_sensor/{sid}",
+                "availability_topic": f"{cfg.device_topic}/status",
                 "device_class": "running",
                 "payload_on": "ON", "payload_off": "OFF",
                 "device": _DEVICE_INFO,
@@ -55,6 +57,7 @@ def publish_discovery(client: mqtt.Client, cfg: Config) -> None:
         disc: dict = {
             "name": p["label"], "unique_id": f"hlc20_{pid}",
             "state_topic": f"{cfg.device_topic}/sensor/{pid}",
+            "availability_topic": f"{cfg.device_topic}/status",
             "state_class": "measurement", "device": _DEVICE_INFO,
         }
         if unit == "°C":
@@ -72,6 +75,7 @@ def publish_discovery(client: mqtt.Client, cfg: Config) -> None:
         disc = {
             "name": label, "unique_id": f"hlc20_{sid}",
             "state_topic": f"{cfg.device_topic}/sensor/{sid}",
+            "availability_topic": f"{cfg.device_topic}/status",
             "unit_of_measurement": "%", "device": _DEVICE_INFO,
         }
         client.publish(
