@@ -99,6 +99,22 @@ def _apply_env(cfg: Config) -> None:
         cfg.discovery_prefix = dp
 
 
+def _merge_defaults(cfg: Config) -> list[str]:
+    """Append default sensors/params whose id is missing (non-destructive migration)."""
+    added: list[str] = []
+    have_s = {s.get("id") for s in cfg.sensors}
+    for d in DEFAULT_SENSORS:
+        if d["id"] not in have_s:
+            cfg.sensors.append(copy.deepcopy(d))
+            added.append(d["id"])
+    have_p = {p.get("id") for p in cfg.params}
+    for d in DEFAULT_PARAMS:
+        if d["id"] not in have_p:
+            cfg.params.append(copy.deepcopy(d))
+            added.append(d["id"])
+    return added
+
+
 def load_config() -> Config:
     if os.path.exists(CONFIG_PATH):
         try:
@@ -114,7 +130,11 @@ def load_config() -> Config:
                 cfg.sensors = data["sensors"]
             if "params" in data:
                 cfg.params = data["params"]
+            added = _merge_defaults(cfg)
             log.info("Config geladen: %s", CONFIG_PATH)
+            if added:
+                save_config(cfg)
+                log.info("Fehlende Default-Einträge ergänzt: %s", ", ".join(added))
             return cfg
         except Exception as exc:
             log.warning("config.json fehlerhaft, nutze Env-Defaults: %s", exc)
