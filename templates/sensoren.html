@@ -49,6 +49,17 @@
     </form>
   </section>
 
+  {# ── Wochenschaltuhr (empirisch rekonstruiert) ───────────────────────────── #}
+  <section class="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+    <h2 class="text-base font-semibold mb-1 text-slate-100">Wochenschaltuhr (empirisch)</h2>
+    <p class="text-xs text-slate-500 mb-4">
+      Aus den Tag/Nacht-Statuswechseln der "status"-Sensoren rekonstruiert (kein direktes Auslesen möglich).
+    </p>
+    <div id="schedule-table" hx-get="/api/schedule-partial" hx-trigger="load, every 60s" hx-swap="outerHTML">
+      <span class="text-xs text-slate-600">…</span>
+    </div>
+  </section>
+
   {# ── Live-Sensoren ─────────────────────────────────────────────────────── #}
   <section>
     <div class="flex items-center justify-between mb-3">

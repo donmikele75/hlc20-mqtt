@@ -47,3 +47,18 @@ def hlc_read_param(ser: serial.Serial, mod: int, idx: int) -> int | None:
     ser.write(cmd)
     time.sleep(READ_DELAY)
     return _decode(ser.read(64))
+
+
+def hlc_write_param(ser: serial.Serial, mod: int, idx: int, value: int) -> int | None:
+    """Write setting parameter (type 01, 16-bit signed BE).
+
+    Command: 99 00 <mod> 01 <idx> <val_hi> <val_lo>
+    Response: 15 <hi> <lo>  (controller echoes the written value back).
+    Returns the echoed value on success, None on timeout/error.
+    """
+    v = value & 0xFFFF
+    cmd = bytes([0x99, 0x00, mod & 0xFF, 0x01, idx & 0xFF, (v >> 8) & 0xFF, v & 0xFF])
+    ser.reset_input_buffer()
+    ser.write(cmd)
+    time.sleep(READ_DELAY)
+    return _decode(ser.read(64))

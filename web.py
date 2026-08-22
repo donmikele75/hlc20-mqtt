@@ -17,6 +17,7 @@ from hlc_parser import parse_hlc
 import paho.mqtt.client as mqtt
 from poller import publish_discovery, publish_state_snapshot
 from protocol import hlc_open
+from schedule_log import DAYS, schedule_logger
 from state import AppState
 
 log = logging.getLogger("hlc20.web")
@@ -194,6 +195,24 @@ async def dashboard_partial(request: Request):
         "values":   _s(request).current_values,
         "sensors":  cfg.sensors,
         "params":   cfg.params,
+    })
+
+
+@app.get("/api/schedule")
+async def api_schedule(request: Request):
+    """Empirisch aus Tag/Nacht-Flanken rekonstruierte Wochenschaltuhr (roh, alle Status-IDs)."""
+    return JSONResponse(schedule_logger.snapshot())
+
+
+@app.get("/api/schedule-partial", response_class=HTMLResponse)
+async def schedule_partial(request: Request):
+    cfg = _c(request)
+    labels = {s["id"]: s["label"] for s in cfg.sensors if s.get("kind") == "status"}
+    snap = schedule_logger.snapshot()
+    return templates.TemplateResponse(request, "_schedule.html", {
+        "days":      DAYS,
+        "labels":    labels,
+        "schedules": {sid: snap.get(sid, {}) for sid in labels},
     })
 
 

@@ -1,0 +1,35 @@
+{# HTMX partial – returned by GET /api/schedule-partial #}
+<div id="schedule-table"
+     hx-get="/api/schedule-partial"
+     hx-trigger="every 60s"
+     hx-swap="outerHTML">
+  <div class="overflow-x-auto rounded-xl border border-slate-700">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-800 text-xs text-slate-400 uppercase tracking-wider">
+        <tr>
+          <th class="px-3 py-2.5 text-left">Wochentag</th>
+          {% for sid, label in labels.items() %}
+          <th class="px-3 py-2.5 text-left">{{ label }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800">
+        {% for day in days %}
+        <tr class="hover:bg-slate-800/50">
+          <td class="px-3 py-2 text-slate-100">{{ day }}</td>
+          {% for sid in labels %}
+            {% set win = schedules.get(sid, {}).get("days", {}).get(day) %}
+            <td class="px-3 py-2 font-mono text-xs {% if win %}text-slate-100{% else %}text-slate-600{% endif %}">
+              {% if win %}{{ win.start }}–{{ win.end }}{% else %}noch nicht beobachtet{% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-slate-500 mt-2">
+    Empirisch aus beobachteten Tag/Nacht-Statuswechseln rekonstruiert – die Steuerung liefert
+    kein Lesekommando für die komplette Wochenschaltuhr. Tabelle füllt sich innerhalb einer Woche.
+  </p>
+</div>

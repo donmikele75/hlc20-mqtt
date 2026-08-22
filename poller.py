@@ -11,6 +11,7 @@ import serial
 from config import Config
 from mixer import MixerAxis
 from protocol import hlc_open, hlc_read, hlc_read_param
+from schedule_log import schedule_logger
 from state import AppState
 
 log = logging.getLogger("hlc20.poller")
@@ -216,6 +217,10 @@ class PollerThread(threading.Thread):
                 value_str = "ON" if raw > 0 else "OFF"
                 if self._mqtt:
                     self._mqtt.publish(f"{cfg.device_topic}/binary_sensor/{sid}", value_str)
+                if kind == "status":
+                    # Wochenschaltuhr laesst sich nicht direkt auslesen (siehe repo-Memory) -
+                    # daher aus den Tag/Nacht-Flanken dieses Live-Status rekonstruieren.
+                    schedule_logger.update(sid, raw > 0, datetime.now())
 
             entry = {
                 "id": sid, "label": s["label"], "value": value_str,
