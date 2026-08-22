@@ -9,6 +9,7 @@ import paho.mqtt.client as mqtt
 import serial
 
 from config import Config
+from mixer import MixerAxis
 from protocol import hlc_open, hlc_read, hlc_read_param
 from state import AppState
 
@@ -36,6 +37,9 @@ class PollerThread(threading.Thread):
         self._reload = threading.Event()
         self._ser: serial.Serial | None = None
         self._mqtt: mqtt.Client | None = None
+        # Modulnummern aus .hlc-Analyse verifiziert; nur lesende Zustandsschaetzung
+        self._mixer_hk = MixerAxis(zu_mod=50, auf_mod=51)
+        self._mixer_fbh = MixerAxis(zu_mod=157, auf_mod=158)
 
     @property
     def _cfg(self) -> Config:
@@ -87,12 +91,23 @@ class PollerThread(threading.Thread):
                 self._close_serial()
                 continue
 
-            # Wait for next cycle, bail early on scan/reload/stop
+            # Wait for next cycle, bail early on scan/reload/stop.
+            # Read-only Mischer-Substatusabfrage in konfigurierbarem Takt einschieben.
             deadline = time.monotonic() + self._cfg.poll_interval
+            next_mixer = time.monotonic()
             while not self._stop.is_set() and time.monotonic() < deadline:
                 if self.state.scan_requested.is_set() or self._reload.is_set():
                     break
-                self._stop.wait(1)
+                now = time.monotonic()
+                if now >= next_mixer and self._ser is not None and self._ser.is_open:
+                    try:
+                        self._poll_mixers()
+                    except Exception as exc:
+                        log.error("Mischer-Poll-Ausnahme: %s", exc)
+                        self._close_serial()
+                        break
+                    next_mixer = time.monotonic() + max(0.5, self._cfg.mixer_poll_interval)
+                self._stop.wait(max(0.2, min(0.5, self._cfg.mixer_poll_interval)))
 
         self._close_serial()
         self._close_mqtt()
@@ -173,6 +188,36 @@ class PollerThread(threading.Thread):
             self.state.emit({"type": "update", **entry})
 
         return errors
+
+    # ── Mischer-Positionsschaetzung (read-only) ──────────────────────────────
+
+    def _poll_mixers(self) -> None:
+        cfg = self._cfg
+        now = time.monotonic()
+        ts = datetime.now(timezone.utc).isoformat()
+        for axis, sid, label in (
+            (self._mixer_hk,  "mischer_hk_position",  "Mischer HK Position (geschätzt)"),
+            (self._mixer_fbh, "mischer_fbh_position", "Mischer FBH Position (geschätzt)"),
+        ):
+            zu_raw = hlc_read(self._ser, axis.zu_mod)
+            auf_raw = hlc_read(self._ser, axis.auf_mod)
+            if zu_raw is None or auf_raw is None:
+                continue
+            axis.update(zu_raw > 0, auf_raw > 0, cfg.mixer_runtime_s, now)
+
+            calibrated = axis.position is not None
+            value_str = f"{axis.position:.0f}" if calibrated else "unkalibriert"
+            if self._mqtt and calibrated:
+                self._mqtt.publish(f"{cfg.device_topic}/sensor/{sid}", value_str)
+
+            entry = {
+                "id": sid, "label": label, "value": value_str,
+                "unit": "%" if calibrated else "", "kind": "mixer_position",
+                "raw": None, "hex": "", "mod": axis.zu_mod,
+                "direction": axis.direction, "calibrated": calibrated, "ts": ts,
+            }
+            self.state.current_values[sid] = entry
+            self.state.emit({"type": "update", **entry})
 
     # ── Bus scan ──────────────────────────────────────────────────────────────
 
@@ -318,4 +363,16 @@ class PollerThread(threading.Thread):
                 disc["unit_of_measurement"] = unit
             client.publish(
                 f"{cfg.discovery_prefix}/sensor/hlc20_{pid}/config",
+                json.dumps(disc), retain=True)
+
+        # Mischer-Positionsschaetzung: nur Prozentwert, kein device_class (kein Standard-Sensortyp)
+        for sid, label in (("mischer_hk_position", "Mischer HK Position (geschätzt)"),
+                           ("mischer_fbh_position", "Mischer FBH Position (geschätzt)")):
+            disc = {
+                "name": label, "unique_id": f"hlc20_{sid}",
+                "state_topic": f"{cfg.device_topic}/sensor/{sid}",
+                "unit_of_measurement": "%", "device": _DEVICE_INFO,
+            }
+            client.publish(
+                f"{cfg.discovery_prefix}/sensor/hlc20_{sid}/config",
                 json.dumps(disc), retain=True)

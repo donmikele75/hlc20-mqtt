@@ -34,9 +34,18 @@ DEFAULT_SENSORS = [
     {"id": "pumpe_fbh",     "label": "Pumpe FBH",      "mod": 153, "kind": "pump", "error_raw": []},
     {"id": "pumpe_zirk",    "label": "Pumpe Zirk",     "mod": 83,  "kind": "pump", "error_raw": []},
     {"id": "pumpe_kessel",  "label": "Pumpe Kessel",   "mod": 8,   "kind": "pump", "error_raw": []},
+    # Kessel
+    {"id": "brenner",      "label": "Brenner",       "mod": 14,  "kind": "burner", "error_raw": []},
     # Betriebsstatus Schaltuhr (live aus Steuerung: 1 = Tagbetrieb aktiv)
     {"id": "hk_tagbetrieb",  "label": "HK Tagbetrieb",  "mod": 42,  "kind": "status", "error_raw": []},
     {"id": "fbh_tagbetrieb", "label": "FBH Tagbetrieb", "mod": 149, "kind": "status", "error_raw": []},
+    # Mischer (Regler-Sollwert + Auf/Zu-Ausgänge, Module über .hlc-Analyse verifiziert)
+    {"id": "mischer_hk_soll",  "label": "Mischer HK Soll",  "mod": 49,  "kind": "temp",  "error_raw": []},
+    {"id": "mischer_hk_zu",    "label": "Mischer HK zu",    "mod": 50,  "kind": "mixer", "error_raw": []},
+    {"id": "mischer_hk_auf",   "label": "Mischer HK auf",   "mod": 51,  "kind": "mixer", "error_raw": []},
+    {"id": "mischer_fbh_soll", "label": "Mischer FBH Soll", "mod": 156, "kind": "temp",  "error_raw": []},
+    {"id": "mischer_fbh_zu",   "label": "Mischer FBH zu",   "mod": 157, "kind": "mixer", "error_raw": []},
+    {"id": "mischer_fbh_auf",  "label": "Mischer FBH auf",  "mod": 158, "kind": "mixer", "error_raw": []},
 ]
 
 DEFAULT_PARAMS = [
@@ -59,6 +68,41 @@ DEFAULT_PARAMS = [
     {"id": "min_pu_hk_ein",  "label": "MinPu-HK-ein",           "mod": 66,  "idx": 0, "unit": "°C"},
     {"id": "zirk_min_ein",   "label": "Zirk-Min ein",           "mod": 88,  "idx": 0, "unit": "°C"},
     {"id": "zirk_max_aus",   "label": "Zirk-Max-aus",           "mod": 82,  "idx": 0, "unit": "°C"},
+    # Puffer (Hysterese-Schwellen, kein kontinuierlicher Sollwert wie bei HK/FBH)
+    {"id": "puffo_ein",     "label": "Puffer oben Einschalttemp",  "mod": 2,  "idx": 0, "unit": "°C"},
+    {"id": "puffo_aus",     "label": "Puffer oben Ausschalttemp",  "mod": 2,  "idx": 1, "unit": "°C"},
+    {"id": "puffm_ein",     "label": "Puffer mitte Einschalttemp", "mod": 21, "idx": 0, "unit": "°C"},
+    {"id": "puffm_aus",     "label": "Puffer mitte Ausschalttemp", "mod": 21, "idx": 1, "unit": "°C"},
+    # Wärmemengenzähler
+    {"id": "waermemenge_kw",        "label": "Leistung",        "mod": 126, "idx": 1, "unit": "kW"},
+    {"id": "waermemenge_kwh",       "label": "Energie gesamt",  "mod": 127, "idx": 1, "unit": "kWh"},
+    {"id": "waermemenge_impuls_l",  "label": "Impuls/Liter",    "mod": 129, "idx": 1, "unit": "Imp/l"},
+    {"id": "waermemenge_kwh_tag",   "label": "kWh Tag",         "mod": 131, "idx": 0, "unit": "kWh"},
+    {"id": "waermemenge_kwh_vortag","label": "kWh Vortag",      "mod": 135, "idx": 1, "unit": "kWh"},
+    {"id": "waermemenge_tageskwh",  "label": "TagKWH",          "mod": 142, "idx": 0, "unit": "kWh"},
+    # Temperaturbegrenzung & Pumpenlogik
+    {"id": "hk_tempbegrenzung",         "label": "HK Temperaturbegrenzung",   "mod": 55,  "idx": 0, "unit": "°C"},
+    {"id": "fbh_tempbegrenzung",        "label": "FBH Temperaturbegrenzung",  "mod": 162, "idx": 0, "unit": "°C"},
+    {"id": "min_pu_fbh_ein",            "label": "MinPu-FBH-ein",             "mod": 177, "idx": 0, "unit": "°C"},
+    {"id": "kesselpumpe_ein_verzoegerung", "label": "Kesselpumpe Ein-Verzögerung", "mod": 9, "idx": 1, "unit": "min"},
+    {"id": "kesselpumpe_aus_nachlauf",     "label": "Kesselpumpe Aus-Nachlauf",    "mod": 9, "idx": 4, "unit": "min"},
+    {"id": "diff_pum_vl_hk_ein",   "label": "Diff-PuM-VL-HK EIN",   "mod": 15, "idx": 0, "unit": "K"},
+    {"id": "diff_pum_vl_hk_aus",   "label": "Diff-PuM-VL-HK AUS",   "mod": 15, "idx": 1, "unit": "K"},
+    {"id": "diff_kesselpumpe_vl_ein", "label": "DiffKess-Pu/VL EIN", "mod": 22, "idx": 4, "unit": "K"},
+    {"id": "diff_kesselpumpe_vl_aus", "label": "DiffKess-Pu/VL AUS", "mod": 22, "idx": 5, "unit": "K"},
+    # Solar-Vorrang (zwei Kreise, laut .hlc mit identischen Default-Werten konfiguriert)
+    {"id": "solar1_min_temp",       "label": "Solar1 Min-Temp",         "mod": 68, "idx": 1, "unit": "°C"},
+    {"id": "solar1_uebertemp_aus",  "label": "Solar1 Übertemp-Aus",     "mod": 68, "idx": 3, "unit": "°C"},
+    {"id": "solar1_diff_ein",       "label": "Solar1 Temp-Diff-Ein",    "mod": 68, "idx": 4, "unit": "K"},
+    {"id": "solar_max_temp_vorrang","label": "Solar Max-Temp Vorrang",  "mod": 74, "idx": 8,  "unit": "°C"},
+    {"id": "solar_max_temp",        "label": "Solar Max-Temp",          "mod": 74, "idx": 13, "unit": "°C"},
+    {"id": "solar2_min_temp_ein",   "label": "Solar2 Min-Temp-Ein",     "mod": 77, "idx": 1, "unit": "°C"},
+    {"id": "solar2_uebertemp_aus",  "label": "Solar2 Übertemp-Aus",     "mod": 77, "idx": 3, "unit": "°C"},
+    {"id": "solar2_diff_ein",       "label": "Solar2 Temp-Diff-Ein",    "mod": 77, "idx": 4, "unit": "K"},
+    # Vorrang-Schalter & Nachtabsenkung
+    {"id": "schalter_boilvorr_hk",  "label": "Schalter Boiler-Vorrang HK",  "mod": 62,  "idx": 0, "unit": ""},
+    {"id": "schalter_boilvorr_fbh", "label": "Schalter Boiler-Vorrang FBH", "mod": 164, "idx": 0, "unit": ""},
+    {"id": "fbh_tempnacht_ein",     "label": "FBH TempNacht ein",           "mod": 170, "idx": 0, "unit": "K"},
 ]
 
 
@@ -73,6 +117,8 @@ class Config:
     poll_interval: int = 60
     device_topic: str = "hlc20"
     discovery_prefix: str = "homeassistant"
+    mixer_poll_interval: float = 2.0   # Sekunden zwischen Mischer-Substatusabfragen (nur lesend)
+    mixer_runtime_s: int = 110         # Angenommene volle Stellzeit des Mischerantriebs in Sekunden
     sensors: list = field(default_factory=lambda: copy.deepcopy(DEFAULT_SENSORS))
     params: list = field(default_factory=lambda: copy.deepcopy(DEFAULT_PARAMS))
 
@@ -123,7 +169,8 @@ def load_config() -> Config:
             cfg = Config()
             for key in ("serial_host", "serial_port", "mqtt_host", "mqtt_port",
                         "mqtt_user", "mqtt_password", "poll_interval",
-                        "device_topic", "discovery_prefix"):
+                        "device_topic", "discovery_prefix",
+                        "mixer_poll_interval", "mixer_runtime_s"):
                 if key in data:
                     setattr(cfg, key, data[key])
             if "sensors" in data:

@@ -18,7 +18,7 @@
             {% if kind != 'temp' %}
               <span class="mt-1 self-start px-2 py-0.5 rounded text-sm font-mono font-semibold
                            {% if v.value == 'ON' %}bg-green-900 text-green-300{% else %}bg-slate-700 text-slate-400{% endif %}">
-                {% if kind == 'status' %}{{ 'Tag' if v.value == 'ON' else 'Nacht' }}{% else %}{{ v.value }}{% endif %}
+                {% if kind == 'status' %}{{ 'Tag' if v.value == 'ON' else 'Nacht' }}{% elif kind == 'mixer' %}{{ 'Aktiv' if v.value == 'ON' else 'Ruhe' }}{% elif kind == 'burner' %}{{ 'Ein' if v.value == 'ON' else 'Aus' }}{% else %}{{ v.value }}{% endif %}
               </span>
             {% else %}
               <span class="text-2xl font-mono font-bold text-slate-100 leading-none">

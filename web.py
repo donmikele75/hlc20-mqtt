@@ -98,6 +98,11 @@ async def sensoren_page(request: Request):
         "sensoren",
         sensors=cfg.sensors,
         params=cfg.params,
+        cfg=cfg,
+        mixer_values={
+            k: v for k, v in _s(request).current_values.items()
+            if k in ("mischer_hk_position", "mischer_fbh_position")
+        },
     ))
 
 
@@ -357,6 +362,21 @@ async def save_einstellungen(
     suffix = " – Verbindung wird neu aufgebaut…" if reconnect else ""
     return HTMLResponse(
         f'<span class="text-green-400 font-medium">✓ Gespeichert{suffix}</span>'
+    )
+
+
+@app.post("/api/mischer-einstellungen", response_class=HTMLResponse)
+async def save_mischer_einstellungen(
+    request: Request,
+    mixer_poll_interval: float = Form(default=2.0),
+    mixer_runtime_s: int = Form(default=110),
+):
+    cfg = _c(request)
+    cfg.mixer_poll_interval = max(0.5, mixer_poll_interval)
+    cfg.mixer_runtime_s = max(1, mixer_runtime_s)
+    save_config(cfg)
+    return HTMLResponse(
+        '<span class="text-green-400 font-medium">✓ Gespeichert</span>'
     )
 
 

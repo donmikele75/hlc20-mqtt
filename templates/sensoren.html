@@ -4,6 +4,51 @@
 {% block content %}
 <div x-data="sensoren()" class="space-y-8">
 
+  {# ── Mischer-Positionsschätzung (read-only, keine Schreibbefehle) ───────── #}
+  <section class="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+    <h2 class="text-base font-semibold mb-1 text-slate-100">Mischer-Positionsschätzung</h2>
+    <p class="text-xs text-slate-500 mb-4">
+      Rein lesend aus den Auf/Zu-Relaiszuständen zeitintegriert. Kalibrierung erfolgt nur passiv,
+      wenn die Steuerung selbst einmal durchgehend bis zum Anschlag fährt.
+    </p>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+      {% for sid, label in (("mischer_hk_position", "Mischer HK"), ("mischer_fbh_position", "Mischer FBH")) %}
+        {% set v = mixer_values.get(sid) %}
+        <div class="bg-slate-900 border border-slate-700 rounded-xl p-3">
+          <span class="text-xs text-slate-400">{{ label }}</span>
+          {% if v %}
+            <div class="text-xl font-mono font-bold text-slate-100">
+              {{ v.value }}{% if v.unit %}<span class="text-sm font-normal text-slate-400"> {{ v.unit }}</span>{% endif %}
+            </div>
+            <span class="text-xs text-slate-500">{{ v.direction }}</span>
+          {% else %}
+            <div class="text-xl font-mono text-slate-600">—</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    <form id="form-mischer" class="flex flex-wrap items-end gap-4">
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Sub-Poll-Intervall (s)</label>
+        <input name="mixer_poll_interval" type="number" step="0.5" min="0.5" value="{{ cfg.mixer_poll_interval }}"
+               class="w-32 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Stellzeit (s)</label>
+        <input name="mixer_runtime_s" type="number" step="1" min="1" value="{{ cfg.mixer_runtime_s }}"
+               class="w-32 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+      </div>
+      <button type="button"
+              hx-post="/api/mischer-einstellungen"
+              hx-include="#form-mischer"
+              hx-target="#mischer-save-result"
+              class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-colors">
+        Speichern
+      </button>
+      <span id="mischer-save-result" class="text-sm"></span>
+    </form>
+  </section>
+
   {# ── Live-Sensoren ─────────────────────────────────────────────────────── #}
   <section>
     <div class="flex items-center justify-between mb-3">
@@ -36,8 +81,8 @@
             <td class="px-3 py-2 font-mono text-slate-300">{{ s.mod }}</td>
             <td class="px-3 py-2">
               <span class="text-xs px-2 py-0.5 rounded-full
-                           {% if s.kind == 'pump' %}bg-purple-900 text-purple-300{% elif s.kind == 'status' %}bg-amber-900 text-amber-300{% else %}bg-blue-900 text-blue-300{% endif %}">
-                {% if s.kind == 'pump' %}Pumpe{% elif s.kind == 'status' %}Status{% else %}Temperatur{% endif %}
+                           {% if s.kind == 'pump' %}bg-purple-900 text-purple-300{% elif s.kind == 'status' %}bg-amber-900 text-amber-300{% elif s.kind == 'mixer' %}bg-teal-900 text-teal-300{% elif s.kind == 'burner' %}bg-orange-900 text-orange-300{% else %}bg-blue-900 text-blue-300{% endif %}">
+                {% if s.kind == 'pump' %}Pumpe{% elif s.kind == 'status' %}Status{% elif s.kind == 'mixer' %}Mischer{% elif s.kind == 'burner' %}Brenner{% else %}Temperatur{% endif %}
               </span>
             </td>
             <td class="px-3 py-2 font-mono text-xs text-slate-500">
@@ -139,6 +184,8 @@
               <option value="temp">Temperatur</option>
               <option value="pump">Pumpe</option>
               <option value="status">Status (Tag/Nacht)</option>
+              <option value="mixer">Mischer (Aktiv/Ruhe)</option>
+              <option value="burner">Brenner (Ein/Aus)</option>
             </select>
           </div>
         </div>
