@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from config import Config, save_config
@@ -19,7 +20,8 @@ from state import AppState
 
 log = logging.getLogger("hlc20.web")
 
-_TEMPLATES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_TEMPLATES = os.path.join(_HERE, "templates")
 templates = Jinja2Templates(directory=_TEMPLATES)
 _executor = ThreadPoolExecutor(max_workers=2)
 
@@ -36,6 +38,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="HLC-20 Web-UI", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=os.path.join(_HERE, "static")), name="static")
 
 
 async def _broadcast_fanout(state: AppState) -> None:
@@ -89,6 +92,14 @@ async def dashboard(request: Request):
 @app.get("/bus-monitor", response_class=HTMLResponse)
 async def bus_monitor_page(request: Request):
     return templates.TemplateResponse(request, "bus_monitor.html", _ctx("bus_monitor"))
+
+
+@app.get("/anlagenschema", response_class=HTMLResponse)
+async def anlagenschema_page(request: Request):
+    return templates.TemplateResponse(request, "anlagenschema.html", _ctx(
+        "anlagenschema",
+        values=_s(request).current_values,
+    ))
 
 
 @app.get("/sensoren", response_class=HTMLResponse)

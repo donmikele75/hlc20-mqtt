@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Anlagenschema{% endblock %}
+
+{% block content %}
+<div x-data="anlagenschema()" x-init="init()" class="space-y-4">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-semibold text-slate-100">Anlagenschema</h1>
+    <span class="text-xs px-2 py-1 rounded-full font-medium"
+          :class="connected ? 'bg-green-950 text-green-400' : 'bg-red-950 text-red-400'">
+      <span class="w-1.5 h-1.5 rounded-full inline-block mr-1"
+            :class="connected ? 'bg-green-400' : 'bg-red-400'"></span>
+      <span x-text="connected ? 'Verbunden' : 'Getrennt'"></span>
+    </span>
+  </div>
+
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 overflow-x-auto">
+    <object id="schema-svg" type="image/svg+xml" data="/static/schema.svg" class="w-full min-w-[1200px]"></object>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function anlagenschema() {
+  return {
+    ws: null,
+    connected: false,
+    svgReady: false,
+    mixerState: {},
+    initialValues: {{ values | tojson }},
+
+    init() {
+      document.getElementById('schema-svg').addEventListener('load', () => {
+        this.svgReady = true;
+        Object.values(this.initialValues).forEach(v => this.applyUpdate(v));
+      });
+      this.connectWS();
+    },
+
+    connectWS() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      this.ws = new WebSocket(`${proto}//${location.host}/ws/bus-monitor`);
+      this.ws.onopen  = () => { this.connected = true; };
+      this.ws.onclose = () => { this.connected = false; setTimeout(() => this.connectWS(), 3000); };
+      this.ws.onerror = () => { this.connected = false; };
+      this.ws.onmessage = (e) => {
+        try {
+          const m = JSON.parse(e.data);
+          if (m.type === 'update') this.applyUpdate(m);
+        } catch {}
+      };
+    },
+
+    svgDoc() {
+      const obj = document.getElementById('schema-svg');
+      return obj ? obj.contentDocument : null;
+    },
+
+    setText(el, text) {
+      if (el) el.textContent = text;
+    },
+
+    applyUpdate(m) {
+      if (!this.svgReady || !m || !m.id) return;
+      const doc = this.svgDoc();
+      if (!doc) return;
+      const on = m.value === 'ON';
+
+      if (m.kind === 'temp') {
+        const el = doc.getElementById(`sensor-${m.id}`) || doc.getElementById(`value-${m.id}`);
+        this.setText(el, `${m.value}°`);
+        return;
+      }
+
+      if (m.kind === 'param') {
+        const el = doc.getElementById(`sensor-${m.id}`) || doc.getElementById(`value-${m.id}`);
+        if (el) {
+          const label = el.textContent.split(':')[0];
+          this.setText(el, `${label}: ${m.value}${m.unit || ''}`);
+        }
+        return;
+      }
+
+      if (m.kind === 'burner') {
+        this.setText(doc.getElementById(`sensor-${m.id}`), `Brenner: ${on ? 'Ein' : 'Aus'}`);
+        return;
+      }
+
+      if (m.kind === 'status') {
+        const el = doc.getElementById(`sensor-${m.id}`);
+        if (el) {
+          const label = el.textContent.split(':')[0];
+          this.setText(el, `${label}: ${on ? 'Ein' : 'Aus'}`);
+        }
+        return;
+      }
+
+      if (m.kind === 'pump') {
+        const circle = doc.getElementById(`pump-${m.id}`);
+        if (circle) circle.style.fill = on ? '#22c55e' : 'none';
+        this.setText(doc.getElementById(`pumpstatus-${m.id}`), on ? 'Ein' : 'Aus');
+        return;
+      }
+
+      if (m.kind === 'mixer') {
+        // ids look like mischer_hk_zu / mischer_hk_auf / mischer_fbh_zu / mischer_fbh_auf
+        const match = m.id.match(/^(mischer_(?:hk|fbh))_(zu|auf)$/);
+        if (!match) return;
+        const [, circuit, direction] = match;
+        this.mixerState[circuit] = this.mixerState[circuit] || {};
+        this.mixerState[circuit][direction] = on;
+        const state = this.mixerState[circuit];
+        const textEl = doc.getElementById(`sensor-${circuit}_zu`);
+        this.setText(textEl, `Zu: ${state.zu ? 'Ein' : 'Aus'} · Auf: ${state.auf ? 'Ein' : 'Aus'}`);
+        const shape = doc.getElementById(`mixer-${circuit}`);
+        if (shape) {
+          const color = state.auf ? '#16a34a' : state.zu ? '#dc2626' : '#d97706';
+          shape.style.fill = color;
+        }
+      }
+    },
+  };
+}
+</script>
+{% endblock %}

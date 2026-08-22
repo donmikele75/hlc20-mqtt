@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" font-family="Segoe UI, Arial, sans-serif">
   <style>
     .vl { stroke:#e04b2f; stroke-width:3.5; fill:none; }
@@ -14,136 +15,100 @@
     .sectionTitle { fill:#f1f5f9; font-size:20px; font-weight:700; }
     .thresh { fill:#64748b; font-size:11px; }
   </style>
-
   <rect x="0" y="0" width="1400" height="900" fill="#0b1220"/>
-  <text x="20" y="30" class="sectionTitle">Hanazeder HLC-20 – Anlagenschema</text>
-
-  <!-- ═══════════════ SOLARANLAGE ═══════════════ -->
-  <g id="group-solar">
-    <text x="40" y="65" class="groupLabel">Solaranlage</text>
-    <rect x="20" y="90" width="170" height="150" class="box" rx="8"/>
-    <text x="105" y="112" class="boxLabel" text-anchor="middle" font-size="13">Solar</text>
-    <text x="105" y="140" class="thresh" text-anchor="middle" id="sensor-waermemenge_kw">Leistung: 30.4 kW</text>
-    <text x="105" y="158" class="thresh" text-anchor="middle" id="value-waermemenge_kwh">Energie: 0.2 kWh</text>
-
-    <circle id="pump-pumpe_solar" cx="260" cy="225" r="15" class="pump" style="fill:none"/>
-    <text x="260" y="229" class="pumpLabel" font-size="13">P</text>
-    <text x="260" y="200" class="pumpLabel">Aus</text>
-
-    <path class="vl" d="M190,190 L230,190 L230,225 L245,225"/>
-    <path class="vl" d="M275,225 L325,225"/>
-    <circle id="sensor-vorl_solar" cx="340" cy="225" r="15" class="sensor"/>
-    <text x="340" y="229" class="sensorValue" font-size="11">30.1°</text>
-    <path class="vl" d="M355,225 L400,225 L400,300"/>
-    <path class="rl" d="M400,320 L315,320"/>
-    <circle id="sensor-rueckl_solar" cx="300" cy="320" r="15" class="sensor"/>
-    <text x="300" y="324" class="sensorValue" font-size="11">29.6°</text>
-    <path class="rl" d="M285,320 L210,320 L210,230 L190,230"/>
+  <text x="20" y="30" class="sectionTitle" style="white-space: pre;">Hanazeder HLC-20 – Anlagenschema</text>
+  <g transform="matrix(1, 0, 0, 1, 1.650638, 35.213657)">
+    <rect x="30.354" y="196.815" width="170" height="105.983" class="box" rx="8" style=""/>
+    <text x="114.354" y="218.815" class="boxLabel" text-anchor="middle" font-size="13" style="white-space: pre; font-size: 15px;">Solar</text>
+    <text x="114.354" y="246.815" class="thresh" text-anchor="middle" id="sensor-waermemenge_kw" style="white-space: pre; font-size: 11px;">Leistung: 30.4 kW</text>
+    <text x="114.354" y="264.815" class="thresh" text-anchor="middle" id="value-waermemenge_kwh" style="white-space: pre; font-size: 11px;">Energie: 0.2 kWh</text>
   </g>
-
-  <!-- ═══════════════ KESSEL (bleibt unterhalb y=460) ═══════════════ -->
-  <g id="group-kessel">
-    <text x="40" y="470" class="groupLabel">Wärmeerzeugung</text>
+  <circle id="pump-pumpe_solar" cx="260" cy="271" r="15" class="pump" style="fill:none"/>
+  <text x="260" y="275" class="pumpLabel" font-size="13" style="white-space: pre; font-size: 11px;">P</text>
+  <text x="260" y="246" class="pumpLabel" id="pumpstatus-pumpe_solar" style="white-space: pre; font-size: 11px;">Aus</text>
+  <path class="vl" d="M 202.489 271 L 245 271"/>
+  <path class="vl" d="M 275 271 L 325 271"/>
+  <circle id="sensor-vorl_solar" cx="340" cy="271" r="15" class="sensor"/>
+  <text class="sensorValue" style="font-size: 11px; white-space: pre;" x="340" y="275">30.1°</text>
+  <path class="vl" d="M 355 271 L 400 271"/>
+  <path class="rl" d="M400,320 L315,320"/>
+  <circle id="sensor-rueckl_solar" cx="300" cy="320" r="15" class="sensor"/>
+  <text class="sensorValue" style="font-size: 11px; white-space: pre;" x="300" y="324">29.6°</text>
+  <path class="rl" d="M 283.799 320 L 202.747 320"/>
+  <g transform="matrix(1, 0, 0, 1, 0, 14)">
     <rect x="30" y="480" width="170" height="90" class="box" rx="8"/>
-    <text x="115" y="502" class="boxLabel" text-anchor="middle" font-size="13">Kessel</text>
-    <text x="115" y="520" class="thresh" text-anchor="middle" id="sensor-brenner">Brenner: Aus</text>
-
-    <circle id="pump-pumpe_kessel" cx="270" cy="520" r="15" class="pump" style="fill:none"/>
-    <text x="270" y="524" class="pumpLabel" font-size="13">P</text>
-    <text x="270" y="490" class="pumpLabel">Aus</text>
-
-    <path class="vl" d="M200,500 L230,500 L230,520 L255,520"/>
-    <path class="vl" d="M285,520 L340,520 L340,460 L400,460"/>
-    <path class="rl" d="M400,495 L355,495 L355,540 L200,540"/>
+    <text x="115" y="502" class="boxLabel" text-anchor="middle" font-size="13" style="white-space: pre;">Kessel</text>
+    <text x="115" y="520" class="thresh" text-anchor="middle" id="sensor-brenner" style="white-space: pre;">Brenner: Aus</text>
   </g>
-
-  <!-- ═══════════════ PUFFERSPEICHER ═══════════════ -->
-  <g id="group-puffer">
-    <text x="420" y="210" class="groupLabel">Pufferspeicher</text>
-    <rect x="400" y="230" width="200" height="420" rx="24" fill="#1e293b" stroke="#64748b" stroke-width="3"/>
-
-    <line x1="400" y1="375" x2="600" y2="375" stroke="#334155" stroke-width="2"/>
-    <line x1="400" y1="525" x2="600" y2="525" stroke="#334155" stroke-width="2"/>
-
-    <circle id="sensor-puff_oben" cx="500" cy="300" r="20" class="sensor"/>
-    <text id="value-puff_oben" x="500" y="305" class="sensorValue">58.6°</text>
-    <text x="500" y="350" class="thresh" text-anchor="middle" id="sensor-puffo_ein">Ein 47.0 / Aus 55.0°C</text>
-
-    <circle id="sensor-puff_mitte" cx="500" cy="450" r="20" class="sensor"/>
-    <text id="value-puff_mitte" x="500" y="455" class="sensorValue">47.4°</text>
-    <text x="500" y="500" class="thresh" text-anchor="middle" id="sensor-puffm_ein">Ein 42.0 / Aus 62.0°C</text>
-
-    <circle id="sensor-puff_unten" cx="500" cy="600" r="20" class="sensor"/>
-    <text id="value-puff_unten" x="500" y="605" class="sensorValue">47.3°</text>
+  <circle id="pump-pumpe_kessel" cx="270" cy="520" r="15" class="pump" style="fill:none"/>
+  <text x="270" y="524" class="pumpLabel" font-size="13" style="white-space: pre;">P</text>
+  <text x="270" y="490" class="pumpLabel" id="pumpstatus-pumpe_kessel" style="white-space: pre;">Aus</text>
+  <path class="vl" d="M 200.288 520 L 255 520"/>
+  <path class="vl" d="M 285 520 L 399.423 520"/>
+  <path class="rl" d="M 399.567 563 L 200 563"/>
+  <text x="420" y="210" class="groupLabel" style="white-space: pre;">Pufferspeicher</text>
+  <rect x="400" y="230" width="200" height="420" rx="24" fill="#1e293b" stroke="#64748b" stroke-width="3"/>
+  <line x1="400" y1="375" x2="600" y2="375" stroke="#334155" stroke-width="2"/>
+  <line x1="400" y1="525" x2="600" y2="525" stroke="#334155" stroke-width="2"/>
+  <circle id="sensor-puff_oben" cx="500" cy="300" r="20" class="sensor"/>
+  <text id="value-puff_oben" x="500" y="305" class="sensorValue" style="white-space: pre;">58.5°</text>
+  <text x="500" y="350" class="thresh" text-anchor="middle" id="sensor-puffo_ein" style="white-space: pre;">Ein 47.0 / Aus 55.0°C</text>
+  <circle id="sensor-puff_mitte" cx="500" cy="450" r="20" class="sensor"/>
+  <text id="value-puff_mitte" x="500" y="455" class="sensorValue" style="white-space: pre;">47.3°</text>
+  <text x="500" y="630" class="thresh" text-anchor="middle" id="sensor-puffm_ein" style="white-space: pre; font-size: 11px;">Ein 42.0 / Aus 62.0°C</text>
+  <circle id="sensor-puff_unten" cx="500" cy="585" r="20" class="sensor"/>
+  <text id="value-puff_unten" x="500" y="590" class="sensorValue" style="white-space: pre; font-size: 14px;">47.1°</text>
+  <path class="vl" d="M600,305 L675,305"/>
+  <polygon id="mixer-mischer_hk" points="700,280 725,305 700,330 675,305" class="mixer" style="fill:#d97706"/>
+  <text x="700" y="309" class="mixerLabel" style="white-space: pre;">n/k</text>
+  <text x="700" y="345" class="thresh" text-anchor="middle" id="sensor-mischer_hk_zu" style="white-space: pre;">Zu: Aus · Auf: Aus</text>
+  <circle id="pump-pumpe_hk" cx="790" cy="305" r="15" class="pump" style="fill:none"/>
+  <text x="790" y="309" class="pumpLabel" font-size="12" style="white-space: pre;">P</text>
+  <text x="790" y="284" class="pumpLabel" id="pumpstatus-pumpe_hk" style="white-space: pre;">Aus</text>
+  <path class="vl" d="M725,305 L775,305"/>
+  <g>
+    <rect x="900" y="270" width="140" height="113.86" class="box" rx="8" style=""/>
+    <text x="970" y="292" class="boxLabel" text-anchor="middle" font-size="13" style="white-space: pre;">Heizkörper</text>
+    <text x="970" y="312" class="thresh" text-anchor="middle" id="sensor-vl_soll_hk" style="white-space: pre;">VL soll: 32.6°</text>
+    <text x="970" y="330" class="thresh" text-anchor="middle" id="sensor-hk_tagbetrieb" style="white-space: pre;">Tagbetrieb: Ein</text>
   </g>
-
-  <!-- ═══════════════ HEIZKREIS HK (Anschluss Puffer-oben, Band y=270-345, kreuzt FBH nicht) ═══════════════ -->
-  <g id="group-hk">
-    <text x="660" y="200" class="groupLabel">Heizkreis HK (Heizkörper)</text>
-    <path class="vl" d="M600,305 L675,305"/>
-    <polygon id="mixer-mischer_hk" points="700,280 725,305 700,330 675,305" class="mixer" style="fill:#d97706"/>
-    <text x="700" y="309" class="mixerLabel">n/k</text>
-    <text x="700" y="345" class="thresh" text-anchor="middle" id="sensor-mischer_hk_zu">Zu: Aus · Auf: Aus</text>
-
-    <circle id="pump-pumpe_hk" cx="790" cy="305" r="15" class="pump" style="fill:none"/>
-    <text x="790" y="309" class="pumpLabel" font-size="12">P</text>
-    <text x="790" y="284" class="pumpLabel">Aus</text>
-    <path class="vl" d="M725,305 L775,305"/>
-
-    <rect x="900" y="270" width="140" height="88" class="box" rx="8"/>
-    <text x="970" y="292" class="boxLabel" text-anchor="middle" font-size="13">Heizkörper</text>
-    <text x="970" y="312" class="thresh" text-anchor="middle" id="sensor-vl_soll_hk">VL soll: 33.1°</text>
-    <text x="970" y="330" class="thresh" text-anchor="middle" id="sensor-hk_tagbetrieb">Tagbetrieb: Ein</text>
-    <path class="vl" d="M805,305 L836,305"/>
-    <circle id="sensor-vl_ist_hk" cx="850" cy="305" r="14" class="sensor"/>
-    <text x="850" y="309" class="sensorValue" font-size="11">31.1°</text>
-    <path class="vl" d="M864,305 L900,305"/>
-    <path class="rl" d="M900,345 L600,345"/>
+  <path class="vl" d="M805,305 L836,305"/>
+  <circle id="sensor-vl_ist_hk" cx="850" cy="305" r="14" class="sensor"/>
+  <text class="sensorValue" style="font-size: 11px; white-space: pre;" x="850" y="309">31.7°</text>
+  <path class="vl" d="M864,305 L900,305"/>
+  <path class="rl" d="M 900 361 L 600 361"/>
+  <path class="vl" d="M600,455 L675,455"/>
+  <polygon id="mixer-mischer_fbh" points="700,430 725,455 700,480 675,455" class="mixer" style="fill:#dc2626"/>
+  <text x="700" y="459" class="mixerLabel" style="white-space: pre;">n/k</text>
+  <text x="700" y="495" class="thresh" text-anchor="middle" id="sensor-mischer_fbh_zu" style="white-space: pre;">Zu: Ein · Auf: Aus</text>
+  <circle id="pump-pumpe_fbh" cx="790" cy="455" r="15" class="pump" style="fill:none"/>
+  <text x="790" y="459" class="pumpLabel" font-size="12" style="white-space: pre;">P</text>
+  <text x="790" y="434" class="pumpLabel" id="pumpstatus-pumpe_fbh" style="white-space: pre;">Aus</text>
+  <path class="vl" d="M725,455 L775,455"/>
+  <g transform="matrix(1, 0, 0, 1, 0, 9)">
+    <rect x="900" y="420" width="140" height="111.109" class="box" rx="8" style=""/>
+    <text x="970" y="442" class="boxLabel" text-anchor="middle" font-size="13" style="white-space: pre;">Fußbodenheizung</text>
+    <text x="970" y="462" class="thresh" text-anchor="middle" id="sensor-vl_soll_fbh" style="white-space: pre;">VL soll: 5.0°</text>
+    <text x="970" y="480" class="thresh" text-anchor="middle" id="sensor-fbh_tagbetrieb" style="white-space: pre;">Tagbetrieb: Ein</text>
   </g>
-
-  <!-- ═══════════════ HEIZKREIS FBH/WH (Anschluss Puffer-mitte, Band y=430-505, kreuzt HK nicht) ═══════════════ -->
-  <g id="group-fbh">
-    <text x="660" y="410" class="groupLabel">Heizkreis FBH/WH (Fußboden/Wand)</text>
-    <path class="vl" d="M600,455 L675,455"/>
-    <polygon id="mixer-mischer_fbh" points="700,430 725,455 700,480 675,455" class="mixer" style="fill:#dc2626"/>
-    <text x="700" y="459" class="mixerLabel">n/k</text>
-    <text x="700" y="495" class="thresh" text-anchor="middle" id="sensor-mischer_fbh_zu">Zu: Ein · Auf: Aus</text>
-
-    <circle id="pump-pumpe_fbh" cx="790" cy="455" r="15" class="pump" style="fill:none"/>
-    <text x="790" y="459" class="pumpLabel" font-size="12">P</text>
-    <text x="790" y="434" class="pumpLabel">Aus</text>
-    <path class="vl" d="M725,455 L775,455"/>
-
-    <rect x="900" y="420" width="140" height="88" class="box" rx="8"/>
-    <text x="970" y="442" class="boxLabel" text-anchor="middle" font-size="13">Fußbodenheizung</text>
-    <text x="970" y="462" class="thresh" text-anchor="middle" id="sensor-vl_soll_fbh">VL soll: 5.0°</text>
-    <text x="970" y="480" class="thresh" text-anchor="middle" id="sensor-fbh_tagbetrieb">Tagbetrieb: Ein</text>
-    <path class="vl" d="M805,455 L836,455"/>
-    <circle id="sensor-vl_ist_fbh" cx="850" cy="455" r="14" class="sensor"/>
-    <text x="850" y="459" class="sensorValue" font-size="11">30.8°</text>
-    <path class="vl" d="M864,455 L900,455"/>
-    <path class="rl" d="M900,495 L600,495"/>
-  </g>
-
-  <!-- ═══════════════ ZIRKULATION BW (Anschluss Puffer-unten, unterhalb allem) ═══════════════ -->
-  <g id="group-zirk">
-    <text x="420" y="700" class="groupLabel">Zirkulation Brauchwasser</text>
-    <path class="rl" d="M455,660 L455,720 L640,720"/>
-    <circle id="sensor-fuhl_zirku_bw" cx="670" cy="720" r="15" class="sensor"/>
-    <text x="670" y="724" class="sensorValue" font-size="12">41.5°</text>
-
-    <circle id="pump-pumpe_zirk" cx="760" cy="720" r="15" class="pump" style="fill:none"/>
-    <text x="760" y="724" class="pumpLabel" font-size="12">P</text>
-    <text x="760" y="746" class="pumpLabel">Aus</text>
-    <path class="rl" d="M685,720 L745,720"/>
-    <path class="vl" d="M775,720 L840,720 L840,670 L545,670 L545,660"/>
-    <text x="760" y="765" class="thresh" text-anchor="middle">Ein 30 / Aus 40°C</text>
-  </g>
-
-  <!-- ═══════════════ AUSSEN ═══════════════ -->
-  <g id="group-umgebung">
-    <text x="1160" y="65" class="groupLabel">Umgebung</text>
+  <path class="vl" d="M805,455 L836,455"/>
+  <circle id="sensor-vl_ist_fbh" cx="850" cy="455" r="14" class="sensor"/>
+  <text class="sensorValue" style="font-size: 11px; white-space: pre;" x="850" y="459">30.7°</text>
+  <path class="vl" d="M864,455 L900,455"/>
+  <path class="rl" d="M 900 511 L 600 511"/>
+  <text x="700.307" y="648.083" class="groupLabel" style="white-space: pre; stroke-width: 1; font-size: 13px;">Zirkulation Brauchwasser</text>
+  <path class="rl" d="M 458 651 L 458 711.55 L 657.305 711.55" style="stroke-width: 3.5;"/>
+  <circle id="sensor-fuhl_zirku_bw" cx="673" cy="711" r="15" class="sensor" style="stroke-width: 2.5;"/>
+  <text class="sensorValue" style="font-size: 11px; white-space: pre; stroke-width: 1;" x="673" y="715">41.5°</text>
+  <circle id="pump-pumpe_zirk" cx="763" cy="711" r="15" class="pump" style="fill: none; stroke-width: 2.5;"/>
+  <text x="763" y="715" class="pumpLabel" font-size="12" style="white-space: pre; stroke-width: 1; font-size: 11px;">P</text>
+  <text x="763" y="737" class="pumpLabel" id="pumpstatus-pumpe_zirk" style="white-space: pre; stroke-width: 1; font-size: 11px;">Aus</text>
+  <path class="rl" d="M 688 711.001 L 748 711.001" style="stroke-width: 3.5;"/>
+  <path class="vl" d="M 778 711 L 843 711 L 843 661 L 548 661 L 548 651" style="stroke-width: 3.5;"/>
+  <text x="763" y="756" class="thresh" text-anchor="middle" style="white-space: pre; stroke-width: 1; font-size: 11px;">Ein 30 / Aus 40°C</text>
+  <g id="group-umgebung" transform="matrix(1, 0, 0, 1, -192.57452, 2.200842)">
+    <text x="1160" y="65" class="groupLabel" style="white-space: pre;">Umgebung</text>
     <circle id="sensor-aussenfuehler" cx="1200" cy="105" r="18" class="sensor"/>
-    <text x="1200" y="109" class="sensorValue" font-size="12">21.6°</text>
+    <text x="1200" y="109" class="sensorValue" font-size="12" style="white-space: pre;">22.0°</text>
   </g>
 </svg>
