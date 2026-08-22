@@ -425,10 +425,18 @@ async def publish_sample(
         return HTMLResponse('<span class="text-yellow-400 font-medium">⚠ Kein MQTT-Host angegeben</span>')
     cfg = _c(request)
     values = dict(_s(request).current_values)
+    used_mockup = False
     if not values:
-        return HTMLResponse(
-            '<span class="text-yellow-400 font-medium">⚠ Noch keine Werte vorhanden – erst einmal erfolgreich pollen lassen</span>'
-        )
+        mockup_path = os.path.join(_HERE, "data", "mockup_values.json")
+        try:
+            with open(mockup_path, encoding="utf-8") as f:
+                values = json.load(f)
+            used_mockup = True
+        except Exception as exc:
+            log.warning("Mockup-Daten nicht ladbar: %s", exc)
+            return HTMLResponse(
+                '<span class="text-yellow-400 font-medium">⚠ Noch keine Werte vorhanden und kein Mockup gefunden</span>'
+            )
     sample_cfg = Config(
         mqtt_host=mqtt_host, mqtt_port=mqtt_port, mqtt_user=mqtt_user,
         mqtt_password=mqtt_password, device_topic=device_topic, discovery_prefix=discovery_prefix,
@@ -448,8 +456,9 @@ async def publish_sample(
         return len(values)
     try:
         count = await loop.run_in_executor(_executor, _do)
+        source = " (Mockup-Daten, kein Poll erfolgt)" if used_mockup else " (letzte Abfrage)"
         return HTMLResponse(
-            f'<span class="text-green-400 font-medium">✓ {count} Werte (letzte Abfrage) + Discovery an Home Assistant gesendet</span>'
+            f'<span class="text-green-400 font-medium">✓ {count} Werte{source} + Discovery an Home Assistant gesendet</span>'
         )
     except Exception as exc:
         return HTMLResponse(
