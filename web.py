@@ -427,7 +427,7 @@ async def publish_sample(
     values = dict(_s(request).current_values)
     used_mockup = False
     if not values:
-        mockup_path = os.path.join(_HERE, "data", "mockup_values.json")
+        mockup_path = os.path.join(_HERE, "static", "mockup_values.json")
         try:
             with open(mockup_path, encoding="utf-8") as f:
                 values = json.load(f)
