@@ -10,5 +10,10 @@
   </a>
 </div>
 
-{% include "_logs.html" %}
+<div id="log-view"
+     hx-get="/api/logs-partial"
+     hx-trigger="load, every 5s"
+     hx-swap="outerHTML">
+  <pre class="bg-slate-950 border border-slate-700 rounded-xl p-4 text-xs leading-relaxed overflow-x-auto max-h-[70vh] overflow-y-auto whitespace-pre-wrap">Lädt…</pre>
+</div>
 {% endblock %}
