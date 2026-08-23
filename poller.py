@@ -500,6 +500,12 @@ class PollerThread(threading.Thread):
                 return
 
             raw = round(value * 10)
+            # Plausibilitaetsband aus dem konfigurierten Wertebereich (grosszuegige Marge) -
+            # ein verstuemmelter/glitch-behafteter Rueckleswert (z.B. 5376 statt 205) darf nie
+            # unbesehen als "bestaetigt" uebernommen und publiziert werden.
+            raw_lo = round(param.get("min", 0) * 10) - 100
+            raw_hi = round(param.get("max", 100) * 10) + 100
+
             with self._ser_lock:
                 if self._ser is None or not self._ser.is_open:
                     log.warning("MQTT-Schreibversuch %s: keine Serial-Verbindung", pid)
@@ -510,13 +516,17 @@ class PollerThread(threading.Thread):
                 # selbst kann trotzdem erfolgreich gewesen sein - daher hier mit kurzem Retry pruefen.
                 time.sleep(READ_DELAY)
                 final_raw = hlc_read_param(self._ser, param["mod"], param["idx"])
-                if final_raw is None:
+                if final_raw is None or not (raw_lo <= final_raw <= raw_hi):
                     time.sleep(READ_DELAY)
                     final_raw = hlc_read_param(self._ser, param["mod"], param["idx"])
 
             if final_raw is None:
                 log.warning("MQTT-Schreiben %s: Wert nach dem Schreiben nicht bestaetigbar (Schreib-Echo: %s)",
                             pid, write_ack)
+                return
+            if not (raw_lo <= final_raw <= raw_hi):
+                log.warning("MQTT-Schreiben %s: Rueckleswert %s unplausibel (ausserhalb [%s, %s]) - verworfen, "
+                            "keine Publikation", pid, final_raw, raw_lo, raw_hi)
                 return
             if final_raw != raw:
                 log.warning("MQTT-Schreiben %s: geschriebener Wert weicht ab (gesendet %s, gelesen %s)",
