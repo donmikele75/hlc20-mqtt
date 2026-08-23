@@ -251,6 +251,8 @@ class PollerThread(threading.Thread):
             self.state.current_values[sid] = entry
             self.state.emit({"type": "update", **entry})
 
+            log.debug("Sensor %-24s (Mod %3d) raw=%-6d -> %s", sid, s["mod"], raw, value_str)
+
         for p in params:
             pid = p["id"]
             try:
@@ -278,6 +280,8 @@ class PollerThread(threading.Thread):
             }
             self.state.current_values[pid] = entry
             self.state.emit({"type": "update", **entry})
+
+            log.debug("Param  %-24s (Mod %3d Idx %d) raw=%-6d -> %s", pid, p["mod"], p.get("idx", 0), raw, value_str)
 
         return errors
 
@@ -315,6 +319,8 @@ class PollerThread(threading.Thread):
                 self.state.current_values[msid] = entry
                 self.state.emit({"type": "update", **entry})
 
+                log.debug("Mischer %-16s (Mod %3d) raw=%-6d -> %s", msid, mod, raw, value_str)
+
             calibrated = axis.position is not None
             value_str = f"{axis.position:.0f}" if calibrated else "unkalibriert"
             if self._mqtt and calibrated:
@@ -329,7 +335,10 @@ class PollerThread(threading.Thread):
             self.state.current_values[sid] = entry
             self.state.emit({"type": "update", **entry})
 
-    # ── Bus scan ──────────────────────────────────────────────────────────────
+            log.debug("Mischer %-16s Position: %s (Richtung=%s, kalibriert=%s)",
+                      sid, value_str, axis.direction, calibrated)
+
+    # ── Bus scan ──────────────────────────────────────────────────────────────────
 
     def _scan(self) -> None:
         log.info("Bus-Scan gestartet")

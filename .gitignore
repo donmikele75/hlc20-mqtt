@@ -1,6 +1,9 @@
 # Lokale Konfiguration – nie committen
 .env
 
+# Persistente Laufzeitdaten (config.json, app.log, schedule_log.json) - gehoert ins Volume, nicht ins Repo
+/data/
+
 # Python
 __pycache__/
 *.pyc

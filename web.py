@@ -397,6 +397,7 @@ async def save_einstellungen(
     device_topic: str = Form(default="hlc20"),
     discovery_prefix: str = Form(default="homeassistant"),
     log_retention_days: int = Form(default=14),
+    log_level: str = Form(default="INFO"),
 ):
     cfg = _c(request)
     reconnect = (
@@ -415,6 +416,8 @@ async def save_einstellungen(
     cfg.discovery_prefix = discovery_prefix
     cfg.log_retention_days = max(1, log_retention_days)
     applog.set_retention_days(cfg.log_retention_days)
+    cfg.log_level = log_level if log_level in ("INFO", "DEBUG") else "INFO"
+    applog.set_level(cfg.log_level)
     save_config(cfg)
     if reconnect:
         _p(request).request_reload()

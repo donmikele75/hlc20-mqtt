@@ -9,11 +9,11 @@ LOG_PATH = os.getenv("LOG_PATH", os.path.join(_HERE, "data", "app.log"))
 _file_handler: logging.handlers.TimedRotatingFileHandler | None = None
 
 
-def setup(retention_days: int = 14, level: int = logging.INFO) -> None:
+def setup(retention_days: int = 14, level: str = "INFO") -> None:
     """Root-Logger mit Konsole + rotierender Datei (persistiert unter /app/data) einrichten."""
     global _file_handler
     root = logging.getLogger()
-    root.setLevel(level)
+    root.setLevel(logging.getLevelName(level))
 
     fmt = logging.Formatter("%(asctime)s  %(levelname)-7s  %(name)s  %(message)s",
                              datefmt="%Y-%m-%d %H:%M:%S")
@@ -38,6 +38,11 @@ def set_retention_days(days: int) -> None:
     """Aufbewahrungsdauer nachtraeglich anpassen (z.B. nach Einstellungen-Speichern)."""
     if _file_handler is not None:
         _file_handler.backupCount = max(1, days)
+
+
+def set_level(level: str) -> None:
+    """Log-Level nachtraeglich anpassen (z.B. auf DEBUG fuer einzelne Sensor-Reads)."""
+    logging.getLogger().setLevel(logging.getLevelName(level))
 
 
 def tail(n: int = 300) -> list[str]:
