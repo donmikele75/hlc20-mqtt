@@ -23,10 +23,12 @@ _UNCONFIGURED = -9999
 
 
 def _decode(resp: bytes) -> int | None:
-    i = resp.find(0x15)
-    if i < 0 or i + 2 >= len(resp):
+    # Strikt genau 3 Bytes beginnend mit dem Marker verlangen - kein Scan nach
+    # 0x15 irgendwo im Puffer, da das bei TCP-Bridge-Jitter stets/versehentlich
+    # veraltete/verschobene Bytes einer frueheren Antwort treffen kann.
+    if len(resp) != 3 or resp[0] != 0x15:
         return None
-    raw = (resp[i + 1] << 8) | resp[i + 2]
+    raw = (resp[1] << 8) | resp[2]
     raw = raw - 65536 if raw > 32767 else raw
     return None if raw == _UNCONFIGURED else raw
 
@@ -37,7 +39,7 @@ def hlc_read(ser: serial.Serial, mod: int) -> int | None:
     ser.reset_input_buffer()
     ser.write(cmd)
     time.sleep(READ_DELAY)
-    return _decode(ser.read(64))
+    return _decode(ser.read(3))
 
 
 def hlc_read_param(ser: serial.Serial, mod: int, idx: int) -> int | None:
@@ -46,7 +48,7 @@ def hlc_read_param(ser: serial.Serial, mod: int, idx: int) -> int | None:
     ser.reset_input_buffer()
     ser.write(cmd)
     time.sleep(READ_DELAY)
-    return _decode(ser.read(64))
+    return _decode(ser.read(3))
 
 
 def hlc_write_param(ser: serial.Serial, mod: int, idx: int, value: int) -> int | None:
@@ -61,4 +63,4 @@ def hlc_write_param(ser: serial.Serial, mod: int, idx: int, value: int) -> int |
     ser.reset_input_buffer()
     ser.write(cmd)
     time.sleep(READ_DELAY)
-    return _decode(ser.read(64))
+    return _decode(ser.read(3))

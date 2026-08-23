@@ -10,7 +10,7 @@ import serial
 
 from config import Config
 from mixer import MixerAxis
-from protocol import hlc_open, hlc_read, hlc_read_param
+from protocol import READ_DELAY, hlc_open, hlc_read, hlc_read_param
 from schedule_log import schedule_logger
 from state import AppState
 
@@ -214,6 +214,17 @@ class PollerThread(threading.Thread):
 
             kind = s.get("kind", "temp")
             if kind == "temp":
+                prev_raw = self.state.current_values.get(sid, {}).get("raw")
+                if prev_raw is not None and abs(raw - prev_raw) > 150:
+                    # Verdaechtiger Sprung (>15.0 C) - haeufig ein Bus-/TCP-Bridge-Glitch
+                    # (siehe _decode: kein Echo-Check, kein Framing). Gegenlesen zur Bestaetigung.
+                    time.sleep(READ_DELAY)
+                    confirm = hlc_read(self._ser, s["mod"])
+                    if confirm is None or abs(confirm - prev_raw) > 150:
+                        log.warning("Verdaechtiger Sprung bei %s verworfen: %s -> %s (Bestaetigung: %s)",
+                                    sid, prev_raw, raw, confirm)
+                        continue
+                    raw = confirm
                 value_str = str(round(raw / 10.0, 1))
                 if self._mqtt:
                     self._mqtt.publish(f"{cfg.device_topic}/sensor/{sid}", value_str)
@@ -271,6 +282,7 @@ class PollerThread(threading.Thread):
         cfg = self._cfg
         now = time.monotonic()
         ts = datetime.now(timezone.utc).isoformat()
+        by_mod = {s["mod"]: s for s in cfg.sensors if s.get("kind") == "mixer"}
         for axis, sid, label in (
             (self._mixer_hk,  "mischer_hk_position",  "Mischer HK Position (geschätzt)"),
             (self._mixer_fbh, "mischer_fbh_position", "Mischer FBH Position (geschätzt)"),
@@ -280,6 +292,23 @@ class PollerThread(threading.Thread):
             if zu_raw is None or auf_raw is None:
                 continue
             axis.update(zu_raw > 0, auf_raw > 0, cfg.mixer_runtime_s, now)
+
+            # Zu/Auf-Rohzustaende im selben schnellen Takt publizieren, nicht erst beim naechsten Hauptpoll.
+            for raw, mod in ((zu_raw, axis.zu_mod), (auf_raw, axis.auf_mod)):
+                sensor = by_mod.get(mod)
+                if sensor is None:
+                    continue
+                msid, mlabel = sensor["id"], sensor["label"]
+                value_str = "ON" if raw > 0 else "OFF"
+                if self._mqtt:
+                    self._mqtt.publish(f"{cfg.device_topic}/binary_sensor/{msid}", value_str)
+                entry = {
+                    "id": msid, "label": mlabel, "value": value_str,
+                    "unit": "", "kind": "mixer", "raw": raw, "hex": _to_hex(raw),
+                    "mod": mod, "ts": ts,
+                }
+                self.state.current_values[msid] = entry
+                self.state.emit({"type": "update", **entry})
 
             calibrated = axis.position is not None
             value_str = f"{axis.position:.0f}" if calibrated else "unkalibriert"
