@@ -324,22 +324,22 @@ class PollerThread(threading.Thread):
 
                 log.debug("Mischer %-16s (Mod %3d) raw=%-6d -> %s", msid, mod, raw, value_str)
 
-            calibrated = axis.position is not None
-            value_str = f"{axis.position:.0f}" if calibrated else "unkalibriert"
-            if self._mqtt and calibrated:
+            has_position = axis.position is not None
+            value_str = f"{axis.position:.0f}" if has_position else "unkalibriert"
+            if self._mqtt and has_position:
                 self._mqtt.publish(f"{cfg.device_topic}/sensor/{sid}", value_str)
 
             entry = {
                 "id": sid, "label": label, "value": value_str,
-                "unit": "%" if calibrated else "", "kind": "mixer_position",
+                "unit": "%" if has_position else "", "kind": "mixer_position",
                 "raw": None, "hex": "", "mod": axis.zu_mod,
-                "direction": axis.direction, "calibrated": calibrated, "ts": ts,
+                "direction": axis.direction, "calibrated": axis.calibrated, "ts": ts,
             }
             self.state.current_values[sid] = entry
             self.state.emit({"type": "update", **entry})
 
             log.debug("Mischer %-16s Position: %s (Richtung=%s, kalibriert=%s)",
-                      sid, value_str, axis.direction, calibrated)
+                      sid, value_str, axis.direction, axis.calibrated)
 
     # ── Bus scan ──────────────────────────────────────────────────────────────────
 
