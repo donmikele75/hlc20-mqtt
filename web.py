@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 import applog
-from config import Config, DEFAULT_PARAMS, MQTT_WRITABLE_ALLOWED_IDS, save_config
+from config import Config, DEFAULT_PARAMS, is_mqtt_writable_eligible, save_config
 from hlc_parser import parse_hlc
 import paho.mqtt.client as mqtt
 from poller import publish_discovery, publish_state_snapshot
@@ -108,15 +108,18 @@ async def anlagenschema_page(request: Request):
 @app.get("/sensoren", response_class=HTMLResponse)
 async def sensoren_page(request: Request):
     cfg = _c(request)
+    mixer_position_ids = {f"mischer_{mx['id']}_position" for mx in cfg.mixers}
     return templates.TemplateResponse(request, "sensoren.html", _ctx(
         "sensoren",
         sensors=cfg.sensors,
         params=cfg.params,
         cfg=cfg,
-        mqtt_writable_allowed=MQTT_WRITABLE_ALLOWED_IDS,
+        mixers=cfg.mixers,
+        mixer_sensor_choices=[s for s in cfg.sensors if s.get("kind") == "mixer"],
+        is_mqtt_writable_eligible=is_mqtt_writable_eligible,
         mixer_values={
             k: v for k, v in _s(request).current_values.items()
-            if k in ("mischer_hk_position", "mischer_fbh_position")
+            if k in mixer_position_ids
         },
     ))
 
@@ -344,12 +347,17 @@ async def param_add(
     mod: int = Form(),
     idx: int = Form(),
     unit: str = Form(default="°C"),
+    p_min: float | None = Form(default=None, alias="min"),
+    p_max: float | None = Form(default=None, alias="max"),
+    p_step: float | None = Form(default=None, alias="step"),
 ):
     cfg = _c(request)
     if any(p["id"] == pid for p in cfg.params):
         raise HTTPException(400, "Parameter-ID bereits vorhanden")
-    cfg.params.append({"id": pid, "label": label, "mod": mod,
-                       "idx": idx, "unit": unit})
+    entry = {"id": pid, "label": label, "mod": mod, "idx": idx, "unit": unit}
+    if p_min is not None and p_max is not None and p_step is not None:
+        entry.update({"min": p_min, "max": p_max, "step": p_step})
+    cfg.params.append(entry)
     save_config(cfg)
     _p(request).request_reload()
     return JSONResponse({"status": "ok", "id": pid})
@@ -363,13 +371,25 @@ async def param_update(
     mod: int = Form(),
     idx: int = Form(),
     unit: str = Form(default="°C"),
+    p_min: float | None = Form(default=None, alias="min"),
+    p_max: float | None = Form(default=None, alias="max"),
+    p_step: float | None = Form(default=None, alias="step"),
 ):
     cfg = _c(request)
     i = next((i for i, p in enumerate(cfg.params) if p["id"] == pid), None)
     if i is None:
         raise HTTPException(404, "Parameter nicht gefunden")
-    cfg.params[i] = {"id": pid, "label": label, "mod": mod,
-                     "idx": idx, "unit": unit}
+    existing = cfg.params[i]
+    updated = {"id": pid, "label": label, "mod": mod, "idx": idx, "unit": unit}
+    if "mqtt_writable" in existing:
+        updated["mqtt_writable"] = existing["mqtt_writable"]
+    if "format" in existing:
+        updated["format"] = existing["format"]
+    if p_min is not None and p_max is not None and p_step is not None:
+        updated["min"], updated["max"], updated["step"] = p_min, p_max, p_step
+    elif all(k in existing for k in ("min", "max", "step")):
+        updated["min"], updated["max"], updated["step"] = existing["min"], existing["max"], existing["step"]
+    cfg.params[i] = updated
     save_config(cfg)
     _p(request).request_reload()
     return JSONResponse({"status": "ok"})
@@ -383,21 +403,75 @@ async def param_delete(request: Request, pid: str):
     return JSONResponse({"status": "ok"})
 
 
+# ── API: Virtuelle Mischer CRUD ────────────────────────────────────────────────
+
+@app.post("/api/mixers/add")
+async def mixer_add(
+    request: Request,
+    mid: str = Form(),
+    label: str = Form(),
+    zu_sensor: str = Form(),
+    auf_sensor: str = Form(),
+):
+    cfg = _c(request)
+    if any(m["id"] == mid for m in cfg.mixers):
+        raise HTTPException(400, "Mischer-ID bereits vorhanden")
+    if not any(s["id"] == zu_sensor for s in cfg.sensors) or not any(s["id"] == auf_sensor for s in cfg.sensors):
+        raise HTTPException(400, "Zu-/Auf-Sensor existiert nicht")
+    cfg.mixers.append({"id": mid, "label": label, "zu_sensor": zu_sensor, "auf_sensor": auf_sensor})
+    save_config(cfg)
+    _p(request).request_reload()
+    return JSONResponse({"status": "ok", "id": mid})
+
+
+@app.post("/api/mixers/{mid}/update")
+async def mixer_update(
+    request: Request,
+    mid: str,
+    label: str = Form(),
+    zu_sensor: str = Form(),
+    auf_sensor: str = Form(),
+):
+    cfg = _c(request)
+    i = next((i for i, m in enumerate(cfg.mixers) if m["id"] == mid), None)
+    if i is None:
+        raise HTTPException(404, "Mischer nicht gefunden")
+    if not any(s["id"] == zu_sensor for s in cfg.sensors) or not any(s["id"] == auf_sensor for s in cfg.sensors):
+        raise HTTPException(400, "Zu-/Auf-Sensor existiert nicht")
+    cfg.mixers[i] = {"id": mid, "label": label, "zu_sensor": zu_sensor, "auf_sensor": auf_sensor}
+    save_config(cfg)
+    _p(request).request_reload()
+    return JSONResponse({"status": "ok"})
+
+
+@app.delete("/api/mixers/{mid}")
+async def mixer_delete(request: Request, mid: str):
+    cfg = _c(request)
+    cfg.mixers = [m for m in cfg.mixers if m["id"] != mid]
+    save_config(cfg)
+    _p(request).request_reload()
+    return JSONResponse({"status": "ok"})
+
+
 @app.post("/api/params/{pid}/mqtt-writable")
 async def param_set_mqtt_writable(request: Request, pid: str, writable: bool = Form()):
-    """Schaltet MQTT-Schreibzugriff fuer einen Parameter um - nur fuer serverseitig freigegebene IDs."""
-    if pid not in MQTT_WRITABLE_ALLOWED_IDS:
-        raise HTTPException(403, "Parameter ist nicht fuer MQTT-Schreibzugriff freigegeben")
+    """Schaltet MQTT-Schreibzugriff fuer einen Parameter um (nicht fuer Schaltuhr-Startzeiten)."""
     cfg = _c(request)
     i = next((i for i, p in enumerate(cfg.params) if p["id"] == pid), None)
     if i is None:
         raise HTTPException(404, "Parameter nicht gefunden")
+    if not is_mqtt_writable_eligible(cfg.params[i]):
+        raise HTTPException(403, "Parameter ist nicht fuer MQTT-Schreibzugriff freigegeben")
     if writable and ("min" not in cfg.params[i] or "max" not in cfg.params[i] or "step" not in cfg.params[i]):
         default = next((d for d in DEFAULT_PARAMS if d["id"] == pid), None)
         if default:
             cfg.params[i].setdefault("min", default.get("min", 0))
             cfg.params[i].setdefault("max", default.get("max", 100))
             cfg.params[i].setdefault("step", default.get("step", 0.5))
+        else:
+            cfg.params[i].setdefault("min", 0)
+            cfg.params[i].setdefault("max", 100)
+            cfg.params[i].setdefault("step", 0.5)
     cfg.params[i]["mqtt_writable"] = writable
     save_config(cfg)
     _p(request).request_reload()

@@ -12,10 +12,11 @@
       wenn die Steuerung selbst einmal durchgehend bis zum Anschlag fährt.
     </p>
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-      {% for sid, label in (("mischer_hk_position", "Mischer HK"), ("mischer_fbh_position", "Mischer FBH")) %}
+      {% for mx in mixers %}
+        {% set sid = "mischer_" ~ mx.id ~ "_position" %}
         {% set v = mixer_values.get(sid) %}
         <div class="bg-slate-900 border border-slate-700 rounded-xl p-3">
-          <span class="text-xs text-slate-400">{{ label }}</span>
+          <span class="text-xs text-slate-400">Mischer {{ mx.label }}</span>
           {% if v %}
             <div class="text-xl font-mono font-bold text-slate-100">
               {{ v.value }}{% if v.unit %}<span class="text-sm font-normal text-slate-400"> {{ v.unit }}</span>{% endif %}
@@ -47,6 +48,51 @@
       </button>
       <span id="mischer-save-result" class="text-sm"></span>
     </form>
+  </section>
+
+  {# ── Virtuelle Mischer (Zu/Auf-Sensoren zuordnen) ────────────────────────── #}
+  <section>
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold">Virtuelle Mischer</h2>
+      <button @click="openMixerModal()"
+              class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition-colors">
+        + Mischer
+      </button>
+    </div>
+
+    <div class="overflow-x-auto rounded-xl border border-slate-700">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-800 text-xs text-slate-400 uppercase tracking-wider">
+          <tr>
+            <th class="px-3 py-2.5 text-left">ID</th>
+            <th class="px-3 py-2.5 text-left">Name</th>
+            <th class="px-3 py-2.5 text-left">Zu-Sensor</th>
+            <th class="px-3 py-2.5 text-left">Auf-Sensor</th>
+            <th class="px-3 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+          {% for mx in mixers %}
+          <tr class="hover:bg-slate-800/50">
+            <td class="px-3 py-2 font-mono text-xs text-slate-400">{{ mx.id }}</td>
+            <td class="px-3 py-2 text-slate-100">{{ mx.label }}</td>
+            <td class="px-3 py-2 font-mono text-slate-300">{{ mx.zu_sensor }}</td>
+            <td class="px-3 py-2 font-mono text-slate-300">{{ mx.auf_sensor }}</td>
+            <td class="px-3 py-2 text-right">
+              <div class="flex justify-end gap-2">
+                <button @click='openMixerModal({{ mx | tojson }})'
+                        class="text-xs text-slate-400 hover:text-slate-100 transition-colors">Bearbeiten</button>
+                <button @click="deleteMixer('{{ mx.id }}')"
+                        class="text-xs text-red-500 hover:text-red-400 transition-colors">Löschen</button>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="px-3 py-6 text-center text-slate-600">Keine virtuellen Mischer konfiguriert</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </section>
 
   {# ── Wochenschaltuhr (empirisch rekonstruiert) ───────────────────────────── #}
@@ -150,7 +196,7 @@
             <td class="px-3 py-2 font-mono text-slate-300">{{ p.idx }}</td>
             <td class="px-3 py-2 text-slate-400">{{ p.unit if p.unit else '—' }}</td>
             <td class="px-3 py-2">
-              {% if p.id in mqtt_writable_allowed %}
+              {% if is_mqtt_writable_eligible(p) %}
               <label class="inline-flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" {% if p.mqtt_writable %}checked{% endif %}
                        @change="toggleMqttWritable('{{ p.id }}', $event.target.checked)"
@@ -265,12 +311,82 @@
                    class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
           </div>
         </div>
+        <div>
+          <p class="text-xs text-slate-500 mb-1">Wertebereich für MQTT-Schreibzugriff (nur relevant, wenn „MQTT-schreibbar" aktiviert wird)</p>
+          <div class="flex gap-3">
+            <div class="flex-1">
+              <label class="block text-xs text-slate-400 mb-1">Min</label>
+              <input x-model.number="paramForm.min" type="number" step="any"
+                     class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            </div>
+            <div class="flex-1">
+              <label class="block text-xs text-slate-400 mb-1">Max</label>
+              <input x-model.number="paramForm.max" type="number" step="any"
+                     class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            </div>
+            <div class="flex-1">
+              <label class="block text-xs text-slate-400 mb-1">Schrittweite</label>
+              <input x-model.number="paramForm.step" type="number" step="any"
+                     class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            </div>
+          </div>
+        </div>
         <div x-show="formError" class="text-red-400 text-sm" x-text="formError"></div>
       </div>
       <div class="flex justify-end gap-3 mt-5">
         <button @click="paramModal=false"
                 class="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-100">Abbrechen</button>
         <button @click="saveParam()"
+                class="px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+          Speichern
+        </button>
+      </div>
+    </div>
+  </div>
+
+  {# ── Mischer-Modal ─────────────────────────────────────────────────────── #}
+  <div x-show="mixerModal" x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+    <div @click.outside="mixerModal=false"
+         class="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl fade-in">
+      <h3 class="text-lg font-semibold mb-4" x-text="mixerForm._edit ? 'Mischer bearbeiten' : 'Mischer hinzufügen'"></h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">ID</label>
+          <input x-model="mixerForm.id" type="text" :disabled="!!mixerForm._edit"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Name</label>
+          <input x-model="mixerForm.label" type="text"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+        <div class="flex gap-3">
+          <div class="flex-1">
+            <label class="block text-xs text-slate-400 mb-1">Zu-Sensor</label>
+            <select x-model="mixerForm.zu_sensor"
+                    class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              {% for s in mixer_sensor_choices %}
+              <option value="{{ s.id }}">{{ s.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="flex-1">
+            <label class="block text-xs text-slate-400 mb-1">Auf-Sensor</label>
+            <select x-model="mixerForm.auf_sensor"
+                    class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              {% for s in mixer_sensor_choices %}
+              <option value="{{ s.id }}">{{ s.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div x-show="formError" class="text-red-400 text-sm" x-text="formError"></div>
+      </div>
+      <div class="flex justify-end gap-3 mt-5">
+        <button @click="mixerModal=false"
+                class="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-100">Abbrechen</button>
+        <button @click="saveMixer()"
                 class="px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-700 text-white transition-colors">
           Speichern
         </button>
@@ -289,6 +405,8 @@ function sensoren() {
     sensorForm: {},
     paramModal: false,
     paramForm: {},
+    mixerModal: false,
+    mixerForm: {},
     formError: '',
 
     openSensorModal(s) {
@@ -331,9 +449,10 @@ function sensoren() {
         this.paramForm = {
           _edit: true, id: p.id, label: p.label,
           mod: p.mod, idx: p.idx, unit: p.unit || '',
+          min: p.min ?? '', max: p.max ?? '', step: p.step ?? '',
         };
       } else {
-        this.paramForm = { id: '', label: '', mod: 0, idx: 0, unit: '°C' };
+        this.paramForm = { id: '', label: '', mod: 0, idx: 0, unit: '°C', min: '', max: '', step: '' };
       }
       this.paramModal = true;
     },
@@ -346,6 +465,11 @@ function sensoren() {
       fd.append('mod',   this.paramForm.mod);
       fd.append('idx',   this.paramForm.idx);
       fd.append('unit',  this.paramForm.unit);
+      if (this.paramForm.min !== '' && this.paramForm.max !== '' && this.paramForm.step !== '') {
+        fd.append('min',  this.paramForm.min);
+        fd.append('max',  this.paramForm.max);
+        fd.append('step', this.paramForm.step);
+      }
       const url = this.paramForm._edit
         ? `/api/params/${this.paramForm.id}/update`
         : '/api/params/add';
@@ -367,6 +491,36 @@ function sensoren() {
         alert((await r.json()).detail || 'Fehler beim Umschalten');
         location.reload();
       }
+    },
+
+    openMixerModal(mx) {
+      this.formError = '';
+      if (mx) {
+        this.mixerForm = { _edit: true, id: mx.id, label: mx.label, zu_sensor: mx.zu_sensor, auf_sensor: mx.auf_sensor };
+      } else {
+        this.mixerForm = { id: '', label: '', zu_sensor: '', auf_sensor: '' };
+      }
+      this.mixerModal = true;
+    },
+
+    async saveMixer() {
+      this.formError = '';
+      const fd = new FormData();
+      fd.append('mid',        this.mixerForm.id);
+      fd.append('label',      this.mixerForm.label);
+      fd.append('zu_sensor',  this.mixerForm.zu_sensor);
+      fd.append('auf_sensor', this.mixerForm.auf_sensor);
+      const url = this.mixerForm._edit
+        ? `/api/mixers/${this.mixerForm.id}/update`
+        : '/api/mixers/add';
+      const r = await fetch(url, { method: 'POST', body: fd });
+      if (r.ok) { location.reload(); } else { this.formError = (await r.json()).detail || 'Fehler'; }
+    },
+
+    async deleteMixer(mid) {
+      if (!confirm('Mischer "' + mid + '" löschen?')) return;
+      await fetch('/api/mixers/' + mid, { method: 'DELETE' });
+      location.reload();
     },
   };
 }

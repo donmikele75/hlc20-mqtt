@@ -10,13 +10,11 @@ log = logging.getLogger("hlc20.config")
 _HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.getenv("CONFIG_PATH", os.path.join(_HERE, "data", "config.json"))
 
-# Parameter, die ueberhaupt per MQTT schreibbar geschaltet werden duerfen (serverseitig
-# durchgesetzt, unabhaengig davon was ein Client/UI-Request behauptet).
-MQTT_WRITABLE_ALLOWED_IDS = frozenset({
-    "hk_nullpunkt", "hk_steigung", "hk_max_soll", "hk_raumsoll", "hk_nachtabs", "hk_max_aussen",
-    "fbh_nullpunkt", "fbh_steigung", "fbh_max_soll", "fbh_raumsoll", "fbh_nachtabs", "fbh_max_aussen",
-    "temp_nacht_ein", "min_pu_hk_ein", "fbh_tempnacht_ein",
-})
+
+def is_mqtt_writable_eligible(param: dict) -> bool:
+    """Jeder Parameter ist grundsaetzlich MQTT-schreibbar schaltbar - ausser Schaltuhr-
+    Startzeiten (format=time_hhmm), die inhaltlich keine gewoehnlichen Zahlenwerte sind."""
+    return param.get("format") != "time_hhmm"
 
 DEFAULT_SENSORS = [
     # Puffer
@@ -118,6 +116,13 @@ DEFAULT_PARAMS = [
     {"id": "fbh_tempnacht_ein",     "label": "FBH TempNacht ein",           "mod": 170, "idx": 0, "unit": "K", "mqtt_writable": False, "min": 0, "max": 30, "step": 0.5},
 ]
 
+# Virtuelle Mischer: referenzieren existierende Sensor-IDs (kind="mixer") statt fester
+# Modulnummern - Modul wird bei jedem Poll live aus dem referenzierten Sensor gelesen.
+DEFAULT_MIXERS = [
+    {"id": "hk",  "label": "HK",  "zu_sensor": "mischer_hk_zu",  "auf_sensor": "mischer_hk_auf"},
+    {"id": "fbh", "label": "FBH", "zu_sensor": "mischer_fbh_zu", "auf_sensor": "mischer_fbh_auf"},
+]
+
 
 @dataclass
 class Config:
@@ -136,6 +141,7 @@ class Config:
     log_level: str = "INFO"            # INFO oder DEBUG (DEBUG protokolliert jeden Sensor-/Parameter-Read)
     sensors: list = field(default_factory=lambda: copy.deepcopy(DEFAULT_SENSORS))
     params: list = field(default_factory=lambda: copy.deepcopy(DEFAULT_PARAMS))
+    mixers: list = field(default_factory=lambda: copy.deepcopy(DEFAULT_MIXERS))
 
 
 def _apply_env(cfg: Config) -> None:
@@ -173,6 +179,11 @@ def _merge_defaults(cfg: Config) -> list[str]:
         if d["id"] not in have_p:
             cfg.params.append(copy.deepcopy(d))
             added.append(d["id"])
+    have_m = {m.get("id") for m in cfg.mixers}
+    for d in DEFAULT_MIXERS:
+        if d["id"] not in have_m:
+            cfg.mixers.append(copy.deepcopy(d))
+            added.append(f"mixer:{d['id']}")
     return added
 
 
@@ -193,6 +204,8 @@ def load_config() -> Config:
                 cfg.sensors = data["sensors"]
             if "params" in data:
                 cfg.params = data["params"]
+            if "mixers" in data:
+                cfg.mixers = data["mixers"]
             added = _merge_defaults(cfg)
             log.info("Config geladen: %s", CONFIG_PATH)
             if added:

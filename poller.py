@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import paho.mqtt.client as mqtt
 import serial
 
-from config import Config, MQTT_WRITABLE_ALLOWED_IDS
+from config import Config, is_mqtt_writable_eligible
 from mixer import MixerAxis
 from protocol import READ_DELAY, WRITE_SETTLE_DELAY, hlc_open, hlc_read, hlc_read_param, hlc_write_param
 from schedule_log import schedule_logger
@@ -54,7 +54,7 @@ def publish_discovery(client: mqtt.Client, cfg: Config) -> None:
 
     for p in cfg.params:
         pid, unit = p["id"], p.get("unit", "°C")
-        writable = bool(p.get("mqtt_writable")) and pid in MQTT_WRITABLE_ALLOWED_IDS
+        writable = bool(p.get("mqtt_writable")) and is_mqtt_writable_eligible(p)
         disc: dict = {
             "name": p["label"], "unique_id": f"hlc20_{pid}",
             "state_topic": f"{cfg.device_topic}/sensor/{pid}",
@@ -87,10 +87,10 @@ def publish_discovery(client: mqtt.Client, cfg: Config) -> None:
             client.publish(f"{cfg.discovery_prefix}/number/hlc20_{pid}/config", "", retain=True)
 
     # Mischer-Positionsschaetzung: nur Prozentwert, kein device_class (kein Standard-Sensortyp)
-    for sid, label in (("mischer_hk_position", "Mischer HK Position (geschätzt)"),
-                       ("mischer_fbh_position", "Mischer FBH Position (geschätzt)")):
+    for mx in cfg.mixers:
+        sid = f"mischer_{mx['id']}_position"
         disc = {
-            "name": label, "unique_id": f"hlc20_{sid}",
+            "name": f"Mischer {mx['label']} Position (geschätzt)", "unique_id": f"hlc20_{sid}",
             "state_topic": f"{cfg.device_topic}/sensor/{sid}",
             "availability_topic": f"{cfg.device_topic}/status",
             "unit_of_measurement": "%", "device": _DEVICE_INFO,
@@ -127,9 +127,9 @@ class PollerThread(threading.Thread):
         self._ser: serial.Serial | None = None
         self._ser_lock = threading.Lock()   # schuetzt _ser vor gleichzeitigem Zugriff (Poll-Thread + MQTT-Callback-Thread)
         self._mqtt: mqtt.Client | None = None
-        # Modulnummern aus .hlc-Analyse verifiziert; nur lesende Zustandsschaetzung
-        self._mixer_hk = MixerAxis(zu_mod=50, auf_mod=51)
-        self._mixer_fbh = MixerAxis(zu_mod=157, auf_mod=158)
+        # Virtuelle Mischer (cfg.mixers) - Achsen werden dynamisch in _poll_mixers()
+        # angelegt/synchronisiert, Modulnummern kommen live aus den referenzierten Sensoren.
+        self._mixer_axes: dict[str, MixerAxis] = {}
 
     @property
     def _cfg(self) -> Config:
@@ -318,23 +318,36 @@ class PollerThread(threading.Thread):
         cfg = self._cfg
         now = time.monotonic()
         ts = datetime.now(timezone.utc).isoformat()
-        by_mod = {s["mod"]: s for s in cfg.sensors if s.get("kind") == "mixer"}
-        for axis, sid, label in (
-            (self._mixer_hk,  "mischer_hk_position",  "Mischer HK Position (geschätzt)"),
-            (self._mixer_fbh, "mischer_fbh_position", "Mischer FBH Position (geschätzt)"),
-        ):
-            zu_raw = hlc_read(self._ser, axis.zu_mod)
-            auf_raw = hlc_read(self._ser, axis.auf_mod)
+        sensors_by_id = {s["id"]: s for s in cfg.sensors}
+        mixer_ids: set[str] = set()
+
+        for mx in cfg.mixers:
+            mid = mx["id"]
+            mixer_ids.add(mid)
+            zu_sensor = sensors_by_id.get(mx.get("zu_sensor"))
+            auf_sensor = sensors_by_id.get(mx.get("auf_sensor"))
+            if zu_sensor is None or auf_sensor is None:
+                log.warning("Virtueller Mischer '%s': Zu-/Auf-Sensor nicht gefunden, uebersprungen", mid)
+                continue
+            zu_mod, auf_mod = zu_sensor["mod"], auf_sensor["mod"]
+
+            axis = self._mixer_axes.get(mid)
+            if axis is None:
+                axis = MixerAxis(zu_mod=zu_mod, auf_mod=auf_mod)
+                self._mixer_axes[mid] = axis
+            else:
+                # Modulnummern live nachziehen, falls der referenzierte Sensor geaendert wurde.
+                axis.zu_mod, axis.auf_mod = zu_mod, auf_mod
+
+            zu_raw = hlc_read(self._ser, zu_mod)
+            auf_raw = hlc_read(self._ser, auf_mod)
             if zu_raw is None or auf_raw is None:
                 continue
             axis.update(zu_raw > 0, auf_raw > 0, cfg.mixer_runtime_s, now)
 
             # Zu/Auf-Rohzustaende im selben schnellen Takt publizieren, nicht erst beim naechsten Hauptpoll.
-            for raw, mod in ((zu_raw, axis.zu_mod), (auf_raw, axis.auf_mod)):
-                sensor = by_mod.get(mod)
-                if sensor is None:
-                    continue
-                msid, mlabel = sensor["id"], sensor["label"]
+            for raw, sensor in ((zu_raw, zu_sensor), (auf_raw, auf_sensor)):
+                msid, mlabel, mod = sensor["id"], sensor["label"], sensor["mod"]
                 value_str = "ON" if raw > 0 else "OFF"
                 if self._mqtt:
                     self._mqtt.publish(f"{cfg.device_topic}/binary_sensor/{msid}", value_str)
@@ -348,6 +361,8 @@ class PollerThread(threading.Thread):
 
                 log.debug("Mischer %-16s (Mod %3d) raw=%-6d -> %s", msid, mod, raw, value_str)
 
+            sid = f"mischer_{mid}_position"
+            label = f"Mischer {mx['label']} Position (geschätzt)"
             has_position = axis.position is not None
             value_str = f"{axis.position:.0f}" if has_position else "unkalibriert"
             if self._mqtt and has_position:
@@ -356,7 +371,7 @@ class PollerThread(threading.Thread):
             entry = {
                 "id": sid, "label": label, "value": value_str,
                 "unit": "%" if has_position else "", "kind": "mixer_position",
-                "raw": None, "hex": "", "mod": axis.zu_mod,
+                "raw": None, "hex": "", "mod": zu_mod,
                 "direction": axis.direction, "calibrated": axis.calibrated, "ts": ts,
             }
             self.state.current_values[sid] = entry
@@ -364,6 +379,10 @@ class PollerThread(threading.Thread):
 
             log.debug("Mischer %-16s Position: %s (Richtung=%s, kalibriert=%s)",
                       sid, value_str, axis.direction, axis.calibrated)
+
+        # Geloeschte virtuelle Mischer aus dem Achsen-Cache entfernen.
+        for stale_id in set(self._mixer_axes) - mixer_ids:
+            del self._mixer_axes[stale_id]
 
     # ── Bus scan ──────────────────────────────────────────────────────────────────
 
@@ -490,7 +509,7 @@ class PollerThread(threading.Thread):
 
             cfg = self._cfg
             param = next((p for p in cfg.params if p["id"] == pid), None)
-            if param is None or pid not in MQTT_WRITABLE_ALLOWED_IDS or not param.get("mqtt_writable"):
+            if param is None or not is_mqtt_writable_eligible(param) or not param.get("mqtt_writable"):
                 log.warning("MQTT-Schreibversuch auf nicht freigegebenen Parameter '%s' abgelehnt", pid)
                 return
 
