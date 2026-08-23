@@ -3,11 +3,11 @@ services:
     image: ghcr.io/donmikele75/hlc20-mqtt:latest
     container_name: hlc20-mqtt
     restart: unless-stopped
-    network_mode: host   # Port 80 direkt auf Host erreichbar (kein ports: mapping nötig)
+    hostname: hlc20-mqtt
     environment:
-      # Startwerte für ersten Start ohne config.json; danach Einstellungen-Seite nutzen
-      # SILEX_HOST/SILEX_PORT bewusst entfernt: bei fehlendem config.json wuerden diese
-      # sonst stillschweigend auf einen veralteten/falschen Serial-Server zeigen.
+      TZ: "Europe/Berlin"
+      SILEX_HOST: "10.1.1.57"
+      SILEX_PORT: "9101"
       MQTT_HOST: "mqtt.int.wagner.tc"
       MQTT_PORT: "1883"
       MQTT_USER: "mqtt"
@@ -15,13 +15,24 @@ services:
       POLL_INTERVAL: "60"
       DEVICE_TOPIC: "hlc20"
       DISCOVERY_PREFIX: "homeassistant"
-    volumes:
-      - hlc20_data:/app/data   # Persistiert config.json über Container-Neustarts
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
+    volumes:
+      - hlc20_data:/app/data   # Persistiert config.json über Container-Neustarts
+    dns:
+      - 10.1.1.1
+    networks:
+      lan:
+        ipv4_address: 10.1.1.215
+        mac_address: 6C-1F-F7-E3-F6-EC
+
+networks:
+    lan:
+        name: lan
+        external: true
 
 volumes:
   hlc20_data:
