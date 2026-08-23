@@ -218,9 +218,12 @@ class PollerThread(threading.Thread):
                 if prev_raw is not None and abs(raw - prev_raw) > 150:
                     # Verdaechtiger Sprung (>15.0 C) - haeufig ein Bus-/TCP-Bridge-Glitch
                     # (siehe _decode: kein Echo-Check, kein Framing). Gegenlesen zur Bestaetigung.
+                    # Wichtig: gegen "raw" pruefen, nicht gegen den (jetzt veralteten) prev_raw -
+                    # sonst wuerde ein echter, dauerhafter Sprung (z.B. Brenner startet) fuer
+                    # immer verworfen werden, weil sich prev_raw nie aktualisiert.
                     time.sleep(READ_DELAY)
                     confirm = hlc_read(self._ser, s["mod"])
-                    if confirm is None or abs(confirm - prev_raw) > 150:
+                    if confirm is None or abs(confirm - raw) > 50:
                         log.warning("Verdaechtiger Sprung bei %s verworfen: %s -> %s (Bestaetigung: %s)",
                                     sid, prev_raw, raw, confirm)
                         continue
