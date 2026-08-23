@@ -504,13 +504,24 @@ class PollerThread(threading.Thread):
                 if self._ser is None or not self._ser.is_open:
                     log.warning("MQTT-Schreibversuch %s: keine Serial-Verbindung", pid)
                     return
-                confirmed = hlc_write_param(self._ser, param["mod"], param["idx"], raw)
-                if confirmed is None:
-                    log.warning("MQTT-Schreiben %s fehlgeschlagen (keine Bestaetigung)", pid)
-                    return
-                readback = hlc_read_param(self._ser, param["mod"], param["idx"])
+                write_ack = hlc_write_param(self._ser, param["mod"], param["idx"], raw)
+                # Bestaetigung entkoppelt vom Schreib-Echo nachlesen: die Steuerung antwortet nach
+                # einem Schreibvorgang gelegentlich minimal verzoegert (> READ_DELAY), das Schreiben
+                # selbst kann trotzdem erfolgreich gewesen sein - daher hier mit kurzem Retry pruefen.
+                time.sleep(READ_DELAY)
+                final_raw = hlc_read_param(self._ser, param["mod"], param["idx"])
+                if final_raw is None:
+                    time.sleep(READ_DELAY)
+                    final_raw = hlc_read_param(self._ser, param["mod"], param["idx"])
 
-            final_raw = readback if readback is not None else confirmed
+            if final_raw is None:
+                log.warning("MQTT-Schreiben %s: Wert nach dem Schreiben nicht bestaetigbar (Schreib-Echo: %s)",
+                            pid, write_ack)
+                return
+            if final_raw != raw:
+                log.warning("MQTT-Schreiben %s: geschriebener Wert weicht ab (gesendet %s, gelesen %s)",
+                            pid, raw, final_raw)
+
             value_str = str(round(final_raw / 10.0, 1))
             if self._mqtt:
                 self._mqtt.publish(f"{cfg.device_topic}/sensor/{pid}", value_str)
