@@ -137,6 +137,11 @@
           <input name="discovery_prefix" type="text" value="{{ cfg.discovery_prefix }}"
                  class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
         </div>
+        <div class="w-40">
+          <label class="block text-xs text-slate-400 mb-1">Protokoll aufheben (Tage)</label>
+          <input name="log_retention_days" type="number" value="{{ cfg.log_retention_days }}" min="1"
+                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
       </div>
     </form>
   </div>

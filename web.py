@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+import applog
 from config import Config, save_config
 from hlc_parser import parse_hlc
 import paho.mqtt.client as mqtt
@@ -132,6 +133,11 @@ async def hlc_analyse_page(request: Request):
     return templates.TemplateResponse(request, "hlc_upload.html", _ctx("hlc_analyse"))
 
 
+@app.get("/protokoll", response_class=HTMLResponse)
+async def protokoll_page(request: Request):
+    return templates.TemplateResponse(request, "protokoll.html", _ctx("protokoll"))
+
+
 @app.post("/api/hlc-parse")
 async def hlc_parse_route(request: Request, file: UploadFile = File(...)):
     if file.size and file.size > 10 * 1024 * 1024:
@@ -213,6 +219,25 @@ async def schedule_partial(request: Request):
         "days":      DAYS,
         "labels":    labels,
         "schedules": {sid: snap.get(sid, {}) for sid in labels},
+    })
+
+
+# ── API: Anwendungs-Log ───────────────────────────────────────────────────────
+
+@app.get("/api/logs")
+async def api_logs(request: Request, n: int = 300):
+    """Rohe Log-Zeilen als JSON - fuer externe/programmatische Diagnose."""
+    return JSONResponse({
+        "path": applog.LOG_PATH,
+        "retention_days": _c(request).log_retention_days,
+        "lines": applog.tail(n),
+    })
+
+
+@app.get("/api/logs-partial", response_class=HTMLResponse)
+async def logs_partial(request: Request, n: int = 300):
+    return templates.TemplateResponse(request, "_logs.html", {
+        "lines": applog.tail(n),
     })
 
 
@@ -371,6 +396,7 @@ async def save_einstellungen(
     poll_interval: int = Form(default=60),
     device_topic: str = Form(default="hlc20"),
     discovery_prefix: str = Form(default="homeassistant"),
+    log_retention_days: int = Form(default=14),
 ):
     cfg = _c(request)
     reconnect = (
@@ -387,6 +413,8 @@ async def save_einstellungen(
     cfg.poll_interval   = poll_interval
     cfg.device_topic    = device_topic
     cfg.discovery_prefix = discovery_prefix
+    cfg.log_retention_days = max(1, log_retention_days)
+    applog.set_retention_days(cfg.log_retention_days)
     save_config(cfg)
     if reconnect:
         _p(request).request_reload()

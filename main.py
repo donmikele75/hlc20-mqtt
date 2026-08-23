@@ -6,21 +6,18 @@ import os
 
 import uvicorn
 
+import applog
 from config import load_config
 from poller import PollerThread
 from state import AppState
 import web as web_module
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)-7s  %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
 log = logging.getLogger("hlc20")
 
 
 async def _main() -> None:
     cfg = load_config()
+    applog.setup(cfg.log_retention_days)
     if not cfg.serial_host:
         log.warning("SERIAL_HOST nicht gesetzt – Serial inaktiv bis Einstellungen gespeichert")
 

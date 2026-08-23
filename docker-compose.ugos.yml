@@ -8,8 +8,8 @@ services:
       - ./data:/app/data
     environment:
       TZ: "Europe/Berlin"
-      SERIAL_HOST: "10.1.1.57"
-      SERIAL_PORT: "9101"
+      SERIAL_HOST: "10.1.1.110"
+      SERIAL_PORT: "4196"
       MQTT_HOST: "mqtt.int.wagner.tc"
       MQTT_PORT: "1883"
       MQTT_USER: "mqtt"

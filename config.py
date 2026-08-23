@@ -119,6 +119,7 @@ class Config:
     discovery_prefix: str = "homeassistant"
     mixer_poll_interval: float = 2.0   # Sekunden zwischen Mischer-Substatusabfragen (nur lesend)
     mixer_runtime_s: int = 110         # Angenommene volle Stellzeit des Mischerantriebs in Sekunden
+    log_retention_days: int = 14       # Aufbewahrungsdauer der Anwendungs-Logdatei
     sensors: list = field(default_factory=lambda: copy.deepcopy(DEFAULT_SENSORS))
     params: list = field(default_factory=lambda: copy.deepcopy(DEFAULT_PARAMS))
 
@@ -170,7 +171,7 @@ def load_config() -> Config:
             for key in ("serial_host", "serial_port", "mqtt_host", "mqtt_port",
                         "mqtt_user", "mqtt_password", "poll_interval",
                         "device_topic", "discovery_prefix",
-                        "mixer_poll_interval", "mixer_runtime_s"):
+                        "mixer_poll_interval", "mixer_runtime_s", "log_retention_days"):
                 if key in data:
                     setattr(cfg, key, data[key])
             if "sensors" in data:

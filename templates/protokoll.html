@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Protokoll{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-xl font-semibold">Protokoll</h1>
+  <a href="/api/logs" target="_blank"
+     class="text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg transition-colors">
+    Als JSON öffnen
+  </a>
+</div>
+
+{% include "_logs.html" %}
+{% endblock %}

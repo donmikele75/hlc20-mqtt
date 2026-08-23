@@ -1,0 +1,8 @@
+{# HTMX partial – returned by GET /api/logs-partial #}
+<div id="log-view"
+     hx-get="/api/logs-partial"
+     hx-trigger="every 5s"
+     hx-swap="outerHTML">
+  <pre class="bg-slate-950 border border-slate-700 rounded-xl p-4 text-xs leading-relaxed overflow-x-auto max-h-[70vh] overflow-y-auto whitespace-pre-wrap">{% for line in lines %}{{ line }}
+{% endfor %}{% if not lines %}(noch keine Log-Einträge){% endif %}</pre>
+</div>
