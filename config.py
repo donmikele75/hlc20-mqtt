@@ -126,8 +126,8 @@ class Config:
 def _apply_env(cfg: Config) -> None:
     """Override still-default fields with env vars (first-run bootstrap)."""
     if not cfg.serial_host:
-        cfg.serial_host = os.getenv("SILEX_HOST", "")
-    if (p := os.getenv("SILEX_PORT")) and cfg.serial_port == 10001:
+        cfg.serial_host = os.getenv("SERIAL_HOST", "")
+    if (p := os.getenv("SERIAL_PORT")) and cfg.serial_port == 10001:
         cfg.serial_port = int(p)
     if h := os.getenv("MQTT_HOST"):
         cfg.mqtt_host = h

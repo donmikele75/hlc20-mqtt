@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Hanazeder HLC-20 → MQTT bridge
-Verbindet per TCP mit dem Silex SX2000U Seriell-Server und
+Verbindet per TCP mit dem seriellen Netzwerk-Server und
 veröffentlicht alle Sensorwerte via MQTT mit Home Assistant Auto-Discovery.
 
 Protokoll-Referenz: https://github.com/binderth/serial_hlc20
@@ -27,8 +27,8 @@ logging.basicConfig(
 log = logging.getLogger("hlc20_mqtt")
 
 # ─── Konfiguration aus Umgebungsvariablen ─────────────────────────────────────
-SILEX_HOST       = os.environ["SILEX_HOST"]
-SILEX_PORT       = int(os.getenv("SILEX_PORT", "10001"))
+SERIAL_HOST      = os.environ["SERIAL_HOST"]
+SERIAL_PORT      = int(os.getenv("SERIAL_PORT", "10001"))
 MQTT_HOST        = os.getenv("MQTT_HOST", "mosquitto")
 MQTT_PORT        = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_USER        = os.getenv("MQTT_USER", "")
@@ -106,9 +106,9 @@ DEVICE_INFO = {
 # ─── HLC-20-Protokoll ─────────────────────────────────────────────────────────
 
 def hlc_open() -> serial.Serial:
-    """Öffnet TCP-Verbindung zum Silex und führt HLC-Handshake durch."""
-    url = f"socket://{SILEX_HOST}:{SILEX_PORT}"
-    log.info("Verbinde mit Silex: %s", url)
+    """Öffnet TCP-Verbindung zum Serial-Server und führt HLC-Handshake durch."""
+    url = f"socket://{SERIAL_HOST}:{SERIAL_PORT}"
+    log.info("Verbinde mit Serial-Server: %s", url)
     ser = serial.serial_for_url(url, baudrate=BAUD_RATE, timeout=0.5)
     ser.write(bytes.fromhex("953073"))
     time.sleep(1.0)
@@ -282,7 +282,7 @@ def main() -> None:
     signal.signal(signal.SIGINT,  _on_signal)
 
     log.info("HLC-20 MQTT Bridge startet (Polling alle %ds)", POLL_INTERVAL)
-    log.info("Silex: %s:%d  MQTT: %s:%d", SILEX_HOST, SILEX_PORT, MQTT_HOST, MQTT_PORT)
+    log.info("Serial-Server: %s:%d  MQTT: %s:%d", SERIAL_HOST, SERIAL_PORT, MQTT_HOST, MQTT_PORT)
 
     client = build_mqtt_client()
     client.publish(f"{DEVICE_TOPIC}/status", "online", retain=True)
@@ -301,7 +301,7 @@ def main() -> None:
                         pass
                 ser = hlc_open()
             except Exception as exc:
-                log.error("Verbindung zu Silex fehlgeschlagen: %s – Retry in 30s", exc)
+                log.error("Verbindung zum Serial-Server fehlgeschlagen: %s – Retry in 30s", exc)
                 time.sleep(30)
                 continue
 

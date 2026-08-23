@@ -22,7 +22,7 @@ log = logging.getLogger("hlc20")
 async def _main() -> None:
     cfg = load_config()
     if not cfg.serial_host:
-        log.warning("SILEX_HOST nicht gesetzt – Serial inaktiv bis Einstellungen gespeichert")
+        log.warning("SERIAL_HOST nicht gesetzt – Serial inaktiv bis Einstellungen gespeichert")
 
     state = AppState()
     state.broadcast_q = asyncio.Queue(maxsize=2000)

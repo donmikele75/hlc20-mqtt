@@ -4,10 +4,12 @@ services:
     container_name: hlc20-mqtt
     restart: unless-stopped
     hostname: hlc20-mqtt
+    volumes:
+      - ./data:/app/data
     environment:
       TZ: "Europe/Berlin"
-      SILEX_HOST: "10.1.1.57"
-      SILEX_PORT: "9101"
+      SERIAL_HOST: "10.1.1.57"
+      SERIAL_PORT: "9101"
       MQTT_HOST: "mqtt.int.wagner.tc"
       MQTT_PORT: "1883"
       MQTT_USER: "mqtt"
@@ -20,8 +22,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    volumes:
-      - hlc20_data:/app/data   # Persistiert config.json über Container-Neustarts
     dns:
       - 10.1.1.1
     networks:
@@ -33,6 +33,3 @@ networks:
     lan:
         name: lan
         external: true
-
-volumes:
-  hlc20_data:
