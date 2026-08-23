@@ -8,6 +8,8 @@ services:
       - ./data:/app/data
     environment:
       TZ: "Europe/Berlin"
+      PUID: "1000"
+      PGID: "10"
       SERIAL_HOST: "10.1.1.110"
       SERIAL_PORT: "4196"
       MQTT_HOST: "mqtt.int.wagner.tc"
