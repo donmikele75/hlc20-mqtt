@@ -68,6 +68,11 @@ DEFAULT_PARAMS = [
     {"id": "min_pu_hk_ein",  "label": "MinPu-HK-ein",           "mod": 66,  "idx": 0, "unit": "°C"},
     {"id": "zirk_min_ein",   "label": "Zirk-Min ein",           "mod": 88,  "idx": 0, "unit": "°C"},
     {"id": "zirk_max_aus",   "label": "Zirk-Max-aus",           "mod": 82,  "idx": 0, "unit": "°C"},
+    # Schaltuhr-Startzeiten (Minuten seit Mitternacht, siehe repo-Memory hlc20-mqtt-protocol.md -
+    # per Snapshot-Diff verifiziert; NUR Start lesbar, kein Ende/volles Wochenmuster per COM)
+    {"id": "hk_aufheizzeit_start",  "label": "HK Aufheizzeit-Start",   "mod": 42,  "idx": 23,  "unit": "", "format": "time_hhmm"},
+    {"id": "hk_tagbetrieb_start",   "label": "HK Tagbetrieb-Start",    "mod": 42,  "idx": 24,  "unit": "", "format": "time_hhmm"},
+    {"id": "fbh_tagbetrieb_start",  "label": "FBH Tagbetrieb-Start",   "mod": 149, "idx": 138, "unit": "", "format": "time_hhmm"},
     # Puffer (Hysterese-Schwellen, kein kontinuierlicher Sollwert wie bei HK/FBH)
     {"id": "puffo_ein",     "label": "Puffer oben Einschalttemp",  "mod": 2,  "idx": 0, "unit": "°C"},
     {"id": "puffo_aus",     "label": "Puffer oben Ausschalttemp",  "mod": 2,  "idx": 1, "unit": "°C"},

@@ -271,7 +271,10 @@ class PollerThread(threading.Thread):
                 errors += 1
                 continue
 
-            value_str = str(round(raw / 10.0, 1))
+            if p.get("format") == "time_hhmm" and 0 <= raw < 1440:
+                value_str = f"{raw // 60:02d}:{raw % 60:02d}"
+            else:
+                value_str = str(round(raw / 10.0, 1))
             if self._mqtt:
                 self._mqtt.publish(f"{cfg.device_topic}/sensor/{pid}", value_str)
 
