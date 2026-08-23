@@ -22,11 +22,16 @@ def setup(retention_days: int = 14, level: int = logging.INFO) -> None:
     console.setFormatter(fmt)
     root.addHandler(console)
 
-    os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
-    _file_handler = logging.handlers.TimedRotatingFileHandler(
-        LOG_PATH, when="midnight", backupCount=max(1, retention_days), encoding="utf-8")
-    _file_handler.setFormatter(fmt)
-    root.addHandler(_file_handler)
+    # Logdatei ist ein Best-effort-Feature (Diagnose per /api/logs) - ein Problem mit
+    # dem gemounteten /app/data (Rechte, Netzwerk-Share o.ae.) darf den App-Start nicht crashen.
+    try:
+        os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+        _file_handler = logging.handlers.TimedRotatingFileHandler(
+            LOG_PATH, when="midnight", backupCount=max(1, retention_days), encoding="utf-8")
+        _file_handler.setFormatter(fmt)
+        root.addHandler(_file_handler)
+    except OSError as exc:
+        root.warning("Log-Datei (%s) nicht beschreibbar, nur Konsole aktiv: %s", LOG_PATH, exc)
 
 
 def set_retention_days(days: int) -> None:
