@@ -137,6 +137,7 @@
             <th class="px-3 py-2.5 text-left">Mod</th>
             <th class="px-3 py-2.5 text-left">Idx</th>
             <th class="px-3 py-2.5 text-left">Einheit</th>
+            <th class="px-3 py-2.5 text-left">MQTT-schreibbar</th>
             <th class="px-3 py-2.5"></th>
           </tr>
         </thead>
@@ -148,6 +149,18 @@
             <td class="px-3 py-2 font-mono text-slate-300">{{ p.mod }}</td>
             <td class="px-3 py-2 font-mono text-slate-300">{{ p.idx }}</td>
             <td class="px-3 py-2 text-slate-400">{{ p.unit if p.unit else '—' }}</td>
+            <td class="px-3 py-2">
+              {% if p.id in mqtt_writable_allowed %}
+              <label class="inline-flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" {% if p.mqtt_writable %}checked{% endif %}
+                       @change="toggleMqttWritable('{{ p.id }}', $event.target.checked)"
+                       class="rounded bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-500">
+                <span class="text-xs text-slate-400">aktiv</span>
+              </label>
+              {% else %}
+              <span class="text-xs text-slate-600">—</span>
+              {% endif %}
+            </td>
             <td class="px-3 py-2 text-right">
               <div class="flex justify-end gap-2">
                 <button @click='openParamModal({{ p | tojson }})'
@@ -158,7 +171,7 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="6" class="px-3 py-6 text-center text-slate-600">Keine Parameter konfiguriert</td></tr>
+          <tr><td colspan="7" class="px-3 py-6 text-center text-slate-600">Keine Parameter konfiguriert</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -344,6 +357,16 @@ function sensoren() {
       if (!confirm('Parameter "' + pid + '" löschen?')) return;
       await fetch('/api/params/' + pid, { method: 'DELETE' });
       location.reload();
+    },
+
+    async toggleMqttWritable(pid, checked) {
+      const fd = new FormData();
+      fd.append('writable', checked ? 'true' : 'false');
+      const r = await fetch(`/api/params/${pid}/mqtt-writable`, { method: 'POST', body: fd });
+      if (!r.ok) {
+        alert((await r.json()).detail || 'Fehler beim Umschalten');
+        location.reload();
+      }
     },
   };
 }

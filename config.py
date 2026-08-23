@@ -10,6 +10,14 @@ log = logging.getLogger("hlc20.config")
 _HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.getenv("CONFIG_PATH", os.path.join(_HERE, "data", "config.json"))
 
+# Parameter, die ueberhaupt per MQTT schreibbar geschaltet werden duerfen (serverseitig
+# durchgesetzt, unabhaengig davon was ein Client/UI-Request behauptet).
+MQTT_WRITABLE_ALLOWED_IDS = frozenset({
+    "hk_nullpunkt", "hk_steigung", "hk_max_soll", "hk_raumsoll", "hk_nachtabs", "hk_max_aussen",
+    "fbh_nullpunkt", "fbh_steigung", "fbh_max_soll", "fbh_raumsoll", "fbh_nachtabs", "fbh_max_aussen",
+    "temp_nacht_ein", "min_pu_hk_ein", "fbh_tempnacht_ein",
+})
+
 DEFAULT_SENSORS = [
     # Puffer
     {"id": "puff_oben",     "label": "Puff oben",      "mod": 3,   "kind": "temp", "error_raw": []},
@@ -50,22 +58,22 @@ DEFAULT_SENSORS = [
 
 DEFAULT_PARAMS = [
     # HK Heizkurve (mod=28)
-    {"id": "hk_nullpunkt",   "label": "HK Nullpunkt",          "mod": 28,  "idx": 0, "unit": "°C"},
-    {"id": "hk_steigung",    "label": "HK Heizkurve Steigung",  "mod": 28,  "idx": 1, "unit": ""},
-    {"id": "hk_max_soll",    "label": "HK Max Solltemp",        "mod": 28,  "idx": 2, "unit": "°C"},
-    {"id": "hk_raumsoll",    "label": "HK Raumsoll",            "mod": 28,  "idx": 3, "unit": "°C"},
-    {"id": "hk_nachtabs",    "label": "HK Nachtabsenkung",      "mod": 28,  "idx": 5, "unit": "K"},
-    {"id": "hk_max_aussen",  "label": "HK Max Außentemp",       "mod": 28,  "idx": 9, "unit": "°C"},
+    {"id": "hk_nullpunkt",   "label": "HK Nullpunkt",          "mod": 28,  "idx": 0, "unit": "°C", "mqtt_writable": False, "min": 0,   "max": 60, "step": 0.5},
+    {"id": "hk_steigung",    "label": "HK Heizkurve Steigung",  "mod": 28,  "idx": 1, "unit": "", "mqtt_writable": False, "min": 0.1, "max": 3.0, "step": 0.1},
+    {"id": "hk_max_soll",    "label": "HK Max Solltemp",        "mod": 28,  "idx": 2, "unit": "°C", "mqtt_writable": False, "min": 20,  "max": 80, "step": 0.5},
+    {"id": "hk_raumsoll",    "label": "HK Raumsoll",            "mod": 28,  "idx": 3, "unit": "°C", "mqtt_writable": False, "min": 10,  "max": 30, "step": 0.5},
+    {"id": "hk_nachtabs",    "label": "HK Nachtabsenkung",      "mod": 28,  "idx": 5, "unit": "K", "mqtt_writable": False, "min": 0,   "max": 20, "step": 0.5},
+    {"id": "hk_max_aussen",  "label": "HK Max Außentemp",       "mod": 28,  "idx": 9, "unit": "°C", "mqtt_writable": False, "min": 0,   "max": 40, "step": 0.5},
     # FBH Heizkurve (mod=143)
-    {"id": "fbh_nullpunkt",  "label": "FBH Nullpunkt",          "mod": 143, "idx": 0, "unit": "°C"},
-    {"id": "fbh_steigung",   "label": "FBH Heizkurve Steigung", "mod": 143, "idx": 1, "unit": ""},
-    {"id": "fbh_max_soll",   "label": "FBH Max Solltemp",       "mod": 143, "idx": 2, "unit": "°C"},
-    {"id": "fbh_raumsoll",   "label": "FBH Raumsoll",           "mod": 143, "idx": 3, "unit": "°C"},
-    {"id": "fbh_nachtabs",   "label": "FBH Nachtabsenkung",     "mod": 143, "idx": 5, "unit": "K"},
-    {"id": "fbh_max_aussen", "label": "FBH Max Außentemp",      "mod": 143, "idx": 9, "unit": "°C"},
+    {"id": "fbh_nullpunkt",  "label": "FBH Nullpunkt",          "mod": 143, "idx": 0, "unit": "°C", "mqtt_writable": False, "min": 0,   "max": 60, "step": 0.5},
+    {"id": "fbh_steigung",   "label": "FBH Heizkurve Steigung", "mod": 143, "idx": 1, "unit": "", "mqtt_writable": False, "min": 0.1, "max": 3.0, "step": 0.1},
+    {"id": "fbh_max_soll",   "label": "FBH Max Solltemp",       "mod": 143, "idx": 2, "unit": "°C", "mqtt_writable": False, "min": 20,  "max": 80, "step": 0.5},
+    {"id": "fbh_raumsoll",   "label": "FBH Raumsoll",           "mod": 143, "idx": 3, "unit": "°C", "mqtt_writable": False, "min": 10,  "max": 30, "step": 0.5},
+    {"id": "fbh_nachtabs",   "label": "FBH Nachtabsenkung",     "mod": 143, "idx": 5, "unit": "K", "mqtt_writable": False, "min": 0,   "max": 20, "step": 0.5},
+    {"id": "fbh_max_aussen", "label": "FBH Max Außentemp",      "mod": 143, "idx": 9, "unit": "°C", "mqtt_writable": False, "min": 0,   "max": 40, "step": 0.5},
     # Betrieb
-    {"id": "temp_nacht_ein", "label": "TempNacht ein",          "mod": 60,  "idx": 0, "unit": "°C"},
-    {"id": "min_pu_hk_ein",  "label": "MinPu-HK-ein",           "mod": 66,  "idx": 0, "unit": "°C"},
+    {"id": "temp_nacht_ein", "label": "TempNacht ein",          "mod": 60,  "idx": 0, "unit": "°C", "mqtt_writable": False, "min": 0,   "max": 30, "step": 0.5},
+    {"id": "min_pu_hk_ein",  "label": "MinPu-HK-ein",           "mod": 66,  "idx": 0, "unit": "°C", "mqtt_writable": False, "min": 0,   "max": 40, "step": 0.5},
     {"id": "zirk_min_ein",   "label": "Zirk-Min ein",           "mod": 88,  "idx": 0, "unit": "°C"},
     {"id": "zirk_max_aus",   "label": "Zirk-Max-aus",           "mod": 82,  "idx": 0, "unit": "°C"},
     # Schaltuhr-Startzeiten (Minuten seit Mitternacht, siehe repo-Memory hlc20-mqtt-protocol.md -
@@ -107,7 +115,7 @@ DEFAULT_PARAMS = [
     # Vorrang-Schalter & Nachtabsenkung
     {"id": "schalter_boilvorr_hk",  "label": "Schalter Boiler-Vorrang HK",  "mod": 62,  "idx": 0, "unit": ""},
     {"id": "schalter_boilvorr_fbh", "label": "Schalter Boiler-Vorrang FBH", "mod": 164, "idx": 0, "unit": ""},
-    {"id": "fbh_tempnacht_ein",     "label": "FBH TempNacht ein",           "mod": 170, "idx": 0, "unit": "K"},
+    {"id": "fbh_tempnacht_ein",     "label": "FBH TempNacht ein",           "mod": 170, "idx": 0, "unit": "K", "mqtt_writable": False, "min": 0, "max": 30, "step": 0.5},
 ]
 
 

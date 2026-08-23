@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 import applog
-from config import Config, save_config
+from config import Config, DEFAULT_PARAMS, MQTT_WRITABLE_ALLOWED_IDS, save_config
 from hlc_parser import parse_hlc
 import paho.mqtt.client as mqtt
 from poller import publish_discovery, publish_state_snapshot
@@ -113,6 +113,7 @@ async def sensoren_page(request: Request):
         sensors=cfg.sensors,
         params=cfg.params,
         cfg=cfg,
+        mqtt_writable_allowed=MQTT_WRITABLE_ALLOWED_IDS,
         mixer_values={
             k: v for k, v in _s(request).current_values.items()
             if k in ("mischer_hk_position", "mischer_fbh_position")
@@ -380,6 +381,27 @@ async def param_delete(request: Request, pid: str):
     cfg.params = [p for p in cfg.params if p["id"] != pid]
     save_config(cfg)
     return JSONResponse({"status": "ok"})
+
+
+@app.post("/api/params/{pid}/mqtt-writable")
+async def param_set_mqtt_writable(request: Request, pid: str, writable: bool = Form()):
+    """Schaltet MQTT-Schreibzugriff fuer einen Parameter um - nur fuer serverseitig freigegebene IDs."""
+    if pid not in MQTT_WRITABLE_ALLOWED_IDS:
+        raise HTTPException(403, "Parameter ist nicht fuer MQTT-Schreibzugriff freigegeben")
+    cfg = _c(request)
+    i = next((i for i, p in enumerate(cfg.params) if p["id"] == pid), None)
+    if i is None:
+        raise HTTPException(404, "Parameter nicht gefunden")
+    if writable and ("min" not in cfg.params[i] or "max" not in cfg.params[i] or "step" not in cfg.params[i]):
+        default = next((d for d in DEFAULT_PARAMS if d["id"] == pid), None)
+        if default:
+            cfg.params[i].setdefault("min", default.get("min", 0))
+            cfg.params[i].setdefault("max", default.get("max", 100))
+            cfg.params[i].setdefault("step", default.get("step", 0.5))
+    cfg.params[i]["mqtt_writable"] = writable
+    save_config(cfg)
+    _p(request).request_reload()
+    return JSONResponse({"status": "ok", "mqtt_writable": writable})
 
 
 # ── API: Settings ─────────────────────────────────────────────────────────────

@@ -8,9 +8,9 @@ from datetime import datetime, timezone
 import paho.mqtt.client as mqtt
 import serial
 
-from config import Config
+from config import Config, MQTT_WRITABLE_ALLOWED_IDS
 from mixer import MixerAxis
-from protocol import READ_DELAY, hlc_open, hlc_read, hlc_read_param
+from protocol import READ_DELAY, hlc_open, hlc_read, hlc_read_param, hlc_write_param
 from schedule_log import schedule_logger
 from state import AppState
 
@@ -54,20 +54,37 @@ def publish_discovery(client: mqtt.Client, cfg: Config) -> None:
 
     for p in cfg.params:
         pid, unit = p["id"], p.get("unit", "°C")
+        writable = bool(p.get("mqtt_writable")) and pid in MQTT_WRITABLE_ALLOWED_IDS
         disc: dict = {
             "name": p["label"], "unique_id": f"hlc20_{pid}",
             "state_topic": f"{cfg.device_topic}/sensor/{pid}",
             "availability_topic": f"{cfg.device_topic}/status",
-            "state_class": "measurement", "device": _DEVICE_INFO,
+            "device": _DEVICE_INFO,
         }
-        if unit == "°C":
-            disc["unit_of_measurement"] = "°C"
-            disc["device_class"] = "temperature"
-        elif unit:
+        if unit:
             disc["unit_of_measurement"] = unit
-        client.publish(
-            f"{cfg.discovery_prefix}/sensor/hlc20_{pid}/config",
-            json.dumps(disc), retain=True)
+
+        if writable:
+            # Schreibbar: als HA "number"-Entity discovern (state + command_topic).
+            disc["command_topic"] = f"{cfg.device_topic}/number/{pid}/set"
+            disc["min"] = p.get("min", 0)
+            disc["max"] = p.get("max", 100)
+            disc["step"] = p.get("step", 0.5)
+            disc["mode"] = "box"
+            client.publish(
+                f"{cfg.discovery_prefix}/number/hlc20_{pid}/config",
+                json.dumps(disc), retain=True)
+            # Alten "sensor"-Discovery-Eintrag entfernen, falls zuvor als reiner Sensor discovered.
+            client.publish(f"{cfg.discovery_prefix}/sensor/hlc20_{pid}/config", "", retain=True)
+        else:
+            disc["state_class"] = "measurement"
+            if unit == "°C":
+                disc["device_class"] = "temperature"
+            client.publish(
+                f"{cfg.discovery_prefix}/sensor/hlc20_{pid}/config",
+                json.dumps(disc), retain=True)
+            # Alten "number"-Discovery-Eintrag entfernen, falls zuvor schreibbar war.
+            client.publish(f"{cfg.discovery_prefix}/number/hlc20_{pid}/config", "", retain=True)
 
     # Mischer-Positionsschaetzung: nur Prozentwert, kein device_class (kein Standard-Sensortyp)
     for sid, label in (("mischer_hk_position", "Mischer HK Position (geschätzt)"),
@@ -108,6 +125,7 @@ class PollerThread(threading.Thread):
         self._stop_evt = threading.Event()   # Name bewusst nicht "_stop" - kollidiert mit Thread._stop()
         self._reload = threading.Event()
         self._ser: serial.Serial | None = None
+        self._ser_lock = threading.Lock()   # schuetzt _ser vor gleichzeitigem Zugriff (Poll-Thread + MQTT-Callback-Thread)
         self._mqtt: mqtt.Client | None = None
         # Modulnummern aus .hlc-Analyse verifiziert; nur lesende Zustandsschaetzung
         self._mixer_hk = MixerAxis(zu_mod=50, auf_mod=51)
@@ -143,11 +161,13 @@ class PollerThread(threading.Thread):
 
             if self.state.scan_requested.is_set():
                 self.state.scan_requested.clear()
-                self._scan()
+                with self._ser_lock:
+                    self._scan()
                 continue
 
             try:
-                errors = self._poll()
+                with self._ser_lock:
+                    errors = self._poll()
                 ts = datetime.now(timezone.utc).isoformat()
                 self.state.last_poll_ts = ts
                 self.state.last_poll_errors = errors
@@ -173,7 +193,8 @@ class PollerThread(threading.Thread):
                 now = time.monotonic()
                 if now >= next_mixer and self._ser is not None and self._ser.is_open:
                     try:
-                        self._poll_mixers()
+                        with self._ser_lock:
+                            self._poll_mixers()
                     except Exception as exc:
                         log.error("Mischer-Poll-Ausnahme: %s", exc)
                         self._close_serial()
@@ -424,8 +445,10 @@ class PollerThread(threading.Thread):
             if cfg.mqtt_user:
                 client.username_pw_set(cfg.mqtt_user, cfg.mqtt_password)
             client.will_set(f"{cfg.device_topic}/status", "offline", retain=True)
+            client.on_message = self._on_mqtt_write
             client.connect(cfg.mqtt_host, cfg.mqtt_port, keepalive=60)
             client.loop_start()
+            client.subscribe(f"{cfg.device_topic}/number/+/set")
             client.publish(f"{cfg.device_topic}/status", "online", retain=True)
             self._mqtt = client
             self.state.mqtt_connected = True
@@ -450,3 +473,57 @@ class PollerThread(threading.Thread):
 
     def _publish_discovery(self, client: mqtt.Client) -> None:
         publish_discovery(client, self._cfg)
+
+    def _on_mqtt_write(self, client: mqtt.Client, userdata, msg) -> None:
+        """Handler fuer '<device_topic>/number/<id>/set' - schreibt ein freigegebenes Einstellparameter."""
+        try:
+            parts = msg.topic.split("/")
+            if len(parts) < 3 or parts[-1] != "set" or parts[-3] != "number":
+                return
+            pid = parts[-2]
+            payload = msg.payload.decode("utf-8", errors="replace").strip()
+            try:
+                value = float(payload)
+            except ValueError:
+                log.warning("MQTT-Schreibversuch %s: ungueltiger Wert '%s'", pid, payload)
+                return
+
+            cfg = self._cfg
+            param = next((p for p in cfg.params if p["id"] == pid), None)
+            if param is None or pid not in MQTT_WRITABLE_ALLOWED_IDS or not param.get("mqtt_writable"):
+                log.warning("MQTT-Schreibversuch auf nicht freigegebenen Parameter '%s' abgelehnt", pid)
+                return
+
+            lo, hi = param.get("min", 0), param.get("max", 100)
+            if not (lo <= value <= hi):
+                log.warning("MQTT-Schreibversuch %s: Wert %s ausserhalb [%s, %s] abgelehnt", pid, value, lo, hi)
+                return
+
+            raw = round(value * 10)
+            with self._ser_lock:
+                if self._ser is None or not self._ser.is_open:
+                    log.warning("MQTT-Schreibversuch %s: keine Serial-Verbindung", pid)
+                    return
+                confirmed = hlc_write_param(self._ser, param["mod"], param["idx"], raw)
+                if confirmed is None:
+                    log.warning("MQTT-Schreiben %s fehlgeschlagen (keine Bestaetigung)", pid)
+                    return
+                readback = hlc_read_param(self._ser, param["mod"], param["idx"])
+
+            final_raw = readback if readback is not None else confirmed
+            value_str = str(round(final_raw / 10.0, 1))
+            if self._mqtt:
+                self._mqtt.publish(f"{cfg.device_topic}/sensor/{pid}", value_str)
+
+            entry = {
+                "id": pid, "label": param["label"], "value": value_str,
+                "unit": param.get("unit", "°C"), "kind": "param",
+                "raw": final_raw, "hex": _to_hex(final_raw),
+                "mod": param["mod"], "idx": param.get("idx", 0),
+                "ts": datetime.now(timezone.utc).isoformat(),
+            }
+            self.state.current_values[pid] = entry
+            self.state.emit({"type": "update", **entry})
+            log.info("MQTT-Schreiben %s -> %s (bestaetigt: %s)", pid, value, value_str)
+        except Exception as exc:
+            log.error("MQTT-Schreib-Handler-Ausnahme: %s", exc)
