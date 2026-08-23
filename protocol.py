@@ -5,6 +5,7 @@ import serial
 
 BAUD_RATE  = 38400
 READ_DELAY = 0.15   # s between TX and first RX byte
+WRITE_SETTLE_DELAY = 0.5   # s nach einem Schreibbefehl - Steuerung braucht laenger zum Uebernehmen als beim reinen Lesen
 
 
 def hlc_open(host: str, port: int) -> tuple[serial.Serial, str | None]:
@@ -62,5 +63,5 @@ def hlc_write_param(ser: serial.Serial, mod: int, idx: int, value: int) -> int |
     cmd = bytes([0x99, 0x00, mod & 0xFF, 0x01, idx & 0xFF, (v >> 8) & 0xFF, v & 0xFF])
     ser.reset_input_buffer()
     ser.write(cmd)
-    time.sleep(READ_DELAY)
+    time.sleep(WRITE_SETTLE_DELAY)
     return _decode(ser.read(3))

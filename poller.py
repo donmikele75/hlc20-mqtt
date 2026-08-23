@@ -10,7 +10,7 @@ import serial
 
 from config import Config, MQTT_WRITABLE_ALLOWED_IDS
 from mixer import MixerAxis
-from protocol import READ_DELAY, hlc_open, hlc_read, hlc_read_param, hlc_write_param
+from protocol import READ_DELAY, WRITE_SETTLE_DELAY, hlc_open, hlc_read, hlc_read_param, hlc_write_param
 from schedule_log import schedule_logger
 from state import AppState
 
@@ -511,13 +511,14 @@ class PollerThread(threading.Thread):
                     log.warning("MQTT-Schreibversuch %s: keine Serial-Verbindung", pid)
                     return
                 write_ack = hlc_write_param(self._ser, param["mod"], param["idx"], raw)
-                # Bestaetigung entkoppelt vom Schreib-Echo nachlesen: die Steuerung antwortet nach
-                # einem Schreibvorgang gelegentlich minimal verzoegert (> READ_DELAY), das Schreiben
-                # selbst kann trotzdem erfolgreich gewesen sein - daher hier mit kurzem Retry pruefen.
-                time.sleep(READ_DELAY)
+                # Bestaetigung entkoppelt vom Schreib-Echo nachlesen: die Steuerung braucht nach
+                # einem Schreibvorgang laenger zum internen Uebernehmen als bei reinen Lesebefehlen
+                # (daher WRITE_SETTLE_DELAY statt READ_DELAY) - das Schreiben selbst kann trotzdem
+                # erfolgreich gewesen sein, falls die erste Nachlesung noch unplausibel ist.
+                time.sleep(WRITE_SETTLE_DELAY)
                 final_raw = hlc_read_param(self._ser, param["mod"], param["idx"])
                 if final_raw is None or not (raw_lo <= final_raw <= raw_hi):
-                    time.sleep(READ_DELAY)
+                    time.sleep(WRITE_SETTLE_DELAY)
                     final_raw = hlc_read_param(self._ser, param["mod"], param["idx"])
 
             if final_raw is None:
