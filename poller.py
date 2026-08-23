@@ -105,7 +105,7 @@ class PollerThread(threading.Thread):
         super().__init__(daemon=True, name="poller")
         self.state = state
         self.cfg_ref = cfg_ref          # mutable [Config] — web routes replace cfg_ref[0]
-        self._stop = threading.Event()
+        self._stop_evt = threading.Event()   # Name bewusst nicht "_stop" - kollidiert mit Thread._stop()
         self._reload = threading.Event()
         self._ser: serial.Serial | None = None
         self._mqtt: mqtt.Client | None = None
@@ -121,12 +121,12 @@ class PollerThread(threading.Thread):
         self._reload.set()
 
     def stop(self) -> None:
-        self._stop.set()
+        self._stop_evt.set()
 
     # ── Main loop ─────────────────────────────────────────────────────────────
 
     def run(self) -> None:
-        while not self._stop.is_set():
+        while not self._stop_evt.is_set():
             if self._reload.is_set():
                 self._reload.clear()
                 self._open_serial()
@@ -135,7 +135,7 @@ class PollerThread(threading.Thread):
             if self._ser is None or not self._ser.is_open:
                 self._open_serial()
                 if self._ser is None:
-                    self._stop.wait(30)
+                    self._stop_evt.wait(30)
                     continue
 
             if self._mqtt is None:
@@ -167,7 +167,7 @@ class PollerThread(threading.Thread):
             # Read-only Mischer-Substatusabfrage in konfigurierbarem Takt einschieben.
             deadline = time.monotonic() + self._cfg.poll_interval
             next_mixer = time.monotonic()
-            while not self._stop.is_set() and time.monotonic() < deadline:
+            while not self._stop_evt.is_set() and time.monotonic() < deadline:
                 if self.state.scan_requested.is_set() or self._reload.is_set():
                     break
                 now = time.monotonic()
@@ -179,7 +179,7 @@ class PollerThread(threading.Thread):
                         self._close_serial()
                         break
                     next_mixer = time.monotonic() + max(0.5, self._cfg.mixer_poll_interval)
-                self._stop.wait(max(0.2, min(0.5, self._cfg.mixer_poll_interval)))
+                self._stop_evt.wait(max(0.2, min(0.5, self._cfg.mixer_poll_interval)))
 
         self._close_serial()
         self._close_mqtt()
@@ -235,7 +235,12 @@ class PollerThread(threading.Thread):
                 if kind == "status":
                     # Wochenschaltuhr laesst sich nicht direkt auslesen (siehe repo-Memory) -
                     # daher aus den Tag/Nacht-Flanken dieses Live-Status rekonstruieren.
-                    schedule_logger.update(sid, raw > 0, datetime.now())
+                    # Best-effort: ein Schreibfehler hier darf nicht den ganzen Poll/die
+                    # Serial-Verbindung mitreissen (z.B. Berechtigungsprobleme auf /app/data).
+                    try:
+                        schedule_logger.update(sid, raw > 0, datetime.now())
+                    except Exception as exc:
+                        log.warning("schedule_log Update fehlgeschlagen (%s): %s", sid, exc)
 
             entry = {
                 "id": sid, "label": s["label"], "value": value_str,
