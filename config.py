@@ -94,6 +94,9 @@ DEFAULT_PARAMS = [
     # Temperaturbegrenzung & Pumpenlogik
     {"id": "hk_tempbegrenzung",         "label": "HK Temperaturbegrenzung",   "mod": 55,  "idx": 0, "unit": "°C"},
     {"id": "fbh_tempbegrenzung",        "label": "FBH Temperaturbegrenzung",  "mod": 162, "idx": 0, "unit": "°C"},
+    # idx=9 live verifiziert (10.1.1.215, 2026-08-28): raw 10/30 -> 1.0/3.0, passt zu test.rtf
+    {"id": "hk_mischergeschwindigkeit",  "label": "HK Mischergeschwindigkeit",  "mod": 44,  "idx": 9, "unit": "", "mqtt_writable": True, "min": 0.1, "max": 80,  "step": 0.1},
+    {"id": "fbh_mischergeschwindigkeit", "label": "FBH Mischergeschwindigkeit", "mod": 151, "idx": 9, "unit": "", "mqtt_writable": True, "min": 0.1, "max": 100, "step": 0.1},
     {"id": "min_pu_fbh_ein",            "label": "MinPu-FBH-ein",             "mod": 177, "idx": 0, "unit": "°C"},
     {"id": "kesselpumpe_ein_verzoegerung", "label": "Kesselpumpe Ein-Verzögerung", "mod": 9, "idx": 1, "unit": "min"},
     {"id": "kesselpumpe_aus_nachlauf",     "label": "Kesselpumpe Aus-Nachlauf",    "mod": 9, "idx": 4, "unit": "min"},
